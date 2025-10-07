@@ -115,6 +115,343 @@ const PRO_PLAN_DEFAULT = 'free';
 const REGISTRATION_SETTINGS_KEY = 'registration';
 const SETTINGS_CACHE_TTL_MS = 30 * 1000;
 
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash-latest';
+
+const AI_FEATURES = ['scan', 'voice', 'chat'];
+const DAILY_LIMITS = {
+  free: {
+    scan: Number(process.env.AI_LIMIT_FREE_SCAN || 5),
+    voice: Number(process.env.AI_LIMIT_FREE_VOICE || 3),
+    chat: Number(process.env.AI_LIMIT_FREE_CHAT || 20),
+  },
+  pro: {
+    scan: Number(process.env.AI_LIMIT_PRO_SCAN || 100),
+    voice: Number(process.env.AI_LIMIT_PRO_VOICE || 60),
+    chat: Number(process.env.AI_LIMIT_PRO_CHAT || 300),
+  },
+};
+
+const HISTORY_LIMITS = {
+  scan: Number(process.env.AI_HISTORY_SCAN || 20),
+  voice: Number(process.env.AI_HISTORY_VOICE || 30),
+  chat: Number(process.env.AI_HISTORY_CHAT || 100),
+};
+
+const SCAN_SYSTEM_PROMPT = `Ты — ИИ-тьютор StudyMate. Анализируй фотографии конспектов и возвращай структурированный JSON на русском языке.
+Используй формат:
+{
+  "summary": "краткое изложение (до 4-5 предложений)",
+  "keyPoints": ["ключевой факт 1", "ключевой факт 2", ...],
+  "questions": ["вопрос для самопроверки 1", ...]
+}
+В "keyPoints" и "questions" должно быть по 3-5 элементов.`;
+
+const VOICE_SYSTEM_PROMPT = `Ты — ИИ-тьютор StudyMate. Тебе передают аудиозапись лекции. Выполни точную расшифровку и анализ.
+Ответ в JSON:
+{
+  "transcription": "подробная расшифровка",
+  "summary": "краткое изложение (до 4-5 предложений)",
+  "keyPoints": ["ключевой факт 1", ...],
+  "questions": ["вопрос 1", ...]
+}
+Пиши на русском языке.`;
+
+const CHAT_SYSTEM_PROMPT = `Ты — AI-репетитор StudyMate. Отвечай дружелюбно, кратко и по делу.
+- Помогай учиться, объясняй сложные темы простыми словами.
+- Если нужна справка с сети, используй свежие знания и указывай, что данные могут быть неточными.
+- Поддерживай русский язык ответа.
+- Если вопрос выходит за рамки обучения, отвечай вежливо.`;
+
+const startOfDay = (value = new Date()) => {
+  const date = new Date(value);
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+};
+
+const ensureAiUsageStructure = (user) => {
+  if (!user.aiUsage) {
+    user.aiUsage = {};
+  }
+
+  for (const feature of AI_FEATURES) {
+    if (!user.aiUsage[feature]) {
+      user.aiUsage[feature] = {
+        dailyCount: 0,
+        totalCount: 0,
+        lastReset: null,
+      };
+    }
+  }
+};
+
+const ensureAiHistoryStructure = (user) => {
+  if (!user.aiHistory) {
+    user.aiHistory = {};
+  }
+
+  for (const feature of AI_FEATURES) {
+    if (!Array.isArray(user.aiHistory[feature])) {
+      user.aiHistory[feature] = [];
+    }
+  }
+};
+
+const ensureStreakStructure = (user) => {
+  if (!user.streak) {
+    user.streak = {
+      current: 0,
+      longest: 0,
+      lastActiveDate: null,
+      updatedAt: null,
+    };
+  }
+};
+
+const getPlanTier = (user) => (user?.pro?.status ? 'pro' : 'free');
+
+const getUsageLimitForUser = (user, feature) => {
+  const tier = getPlanTier(user);
+  return DAILY_LIMITS[tier]?.[feature] ?? DAILY_LIMITS.free[feature] ?? 0;
+};
+
+const resetDailyUsageIfNeeded = (usage) => {
+  if (!usage) {
+    return false;
+  }
+  const todayStart = startOfDay();
+  if (!usage.lastReset || startOfDay(usage.lastReset).getTime() !== todayStart.getTime()) {
+    usage.dailyCount = 0;
+    usage.lastReset = new Date();
+    return true;
+  }
+  return false;
+};
+
+const ensureUsageAvailable = (user, feature) => {
+  ensureAiUsageStructure(user);
+  const usage = user.aiUsage[feature];
+  if (resetDailyUsageIfNeeded(usage)) {
+    if (typeof user.markModified === 'function') {
+      user.markModified('aiUsage');
+    }
+  }
+  return usage;
+};
+
+const checkUsageLimit = (user, feature) => {
+  const usage = ensureUsageAvailable(user, feature);
+  const limit = getUsageLimitForUser(user, feature);
+  return {
+    usage,
+    limit,
+    allowed: usage.dailyCount < limit,
+  };
+};
+
+const incrementUsage = (user, feature) => {
+  const usage = ensureUsageAvailable(user, feature);
+  usage.dailyCount += 1;
+  usage.totalCount += 1;
+  user.markModified('aiUsage');
+};
+
+const updateUserStreak = (user) => {
+  ensureStreakStructure(user);
+  const streak = user.streak;
+  const todayStart = startOfDay();
+  const yesterdayStart = new Date(todayStart);
+  yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+
+  if (streak.lastActiveDate) {
+    const lastActiveStart = startOfDay(streak.lastActiveDate);
+    if (lastActiveStart.getTime() === todayStart.getTime()) {
+      streak.updatedAt = new Date();
+      return;
+    }
+
+    if (lastActiveStart.getTime() === yesterdayStart.getTime()) {
+      streak.current += 1;
+    } else {
+      streak.current = 1;
+    }
+  } else {
+    streak.current = 1;
+  }
+
+  if (!streak.longest || streak.current > streak.longest) {
+    streak.longest = streak.current;
+  }
+
+  streak.lastActiveDate = todayStart;
+  streak.updatedAt = new Date();
+  user.markModified('streak');
+};
+
+const appendHistoryEntry = (user, feature, entry) => {
+  ensureAiHistoryStructure(user);
+  const history = user.aiHistory[feature];
+  history.unshift(entry);
+  const limit = HISTORY_LIMITS[feature] ?? 50;
+  if (history.length > limit) {
+    history.length = limit;
+  }
+  user.markModified('aiHistory');
+};
+
+const buildUsageResponse = (user, feature) => {
+  ensureUsageAvailable(user, feature);
+  const usage = user.aiUsage[feature];
+  const limit = getUsageLimitForUser(user, feature);
+  return {
+    feature,
+    tier: getPlanTier(user),
+    dailyCount: usage.dailyCount,
+    remaining: Math.max(limit - usage.dailyCount, 0),
+    limit,
+    totalCount: usage.totalCount,
+    lastReset: usage.lastReset ? usage.lastReset.toISOString() : null,
+  };
+};
+
+const buildAllUsageResponses = (user) => {
+  const usageMap = {};
+  for (const feature of AI_FEATURES) {
+    usageMap[feature] = buildUsageResponse(user, feature);
+  }
+  return usageMap;
+};
+
+const buildHistoryCounts = (user) => {
+  ensureAiHistoryStructure(user);
+  return AI_FEATURES.reduce((acc, feature) => {
+    const entries = user.aiHistory?.[feature];
+    acc[feature] = Array.isArray(entries) ? entries.length : 0;
+    return acc;
+  }, {});
+};
+
+const buildAiMeta = (user, feature) => ({
+  usage: feature ? buildUsageResponse(user, feature) : buildAllUsageResponses(user),
+  streak: serializeStreak(user.streak),
+  historyCounts: buildHistoryCounts(user),
+});
+
+const serializeStreak = (streak = {}) => {
+  if (!streak) {
+    return {
+      current: 0,
+      longest: 0,
+      lastActiveDate: null,
+      updatedAt: null,
+    };
+  }
+
+  const formatDate = (value) => (value ? new Date(value).toISOString() : null);
+
+  return {
+    current: Number(streak.current || 0),
+    longest: Number(streak.longest || 0),
+    lastActiveDate: formatDate(streak.lastActiveDate),
+    updatedAt: formatDate(streak.updatedAt),
+  };
+};
+
+const serializeHistoryList = (entries = [], mapper = (entry) => entry, limit) => {
+  if (!Array.isArray(entries)) {
+    return [];
+  }
+
+  const mapped = entries.map((entry) => {
+    const base = typeof entry.toObject === 'function' ? entry.toObject() : { ...entry };
+    const mapped = mapper(base);
+    if (mapped.createdAt) {
+      mapped.createdAt = new Date(mapped.createdAt).toISOString();
+    }
+    return mapped;
+  });
+
+  if (typeof limit === 'number' && limit >= 0) {
+    return mapped.slice(0, limit);
+  }
+
+  return mapped;
+};
+
+const safeJsonParse = (value) => {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  try {
+    return JSON.parse(value);
+  } catch (error) {
+    return null;
+  }
+};
+
+const loadAiUser = async (userId) => {
+  const numericId = Number(userId);
+  if (!Number.isFinite(numericId)) {
+    const error = new Error('Некорректный идентификатор пользователя');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const user = await findUserById(numericId);
+  if (!user) {
+    const error = new Error('Пользователь не найден');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  ensureAiUsageStructure(user);
+  ensureAiHistoryStructure(user);
+  ensureStreakStructure(user);
+
+  return user;
+};
+
+const buildLimitError = (feature, meta) => ({
+  message: `Лимит запросов на сегодня исчерпан для функции ${feature}.`,
+  code: 'AI_LIMIT_REACHED',
+  ai: meta,
+});
+
+const generateEntryId = () => (typeof crypto.randomUUID === 'function'
+  ? crypto.randomUUID()
+  : crypto.randomBytes(16).toString('hex'));
+
+const extractTextFromGemini = (result) => {
+  const parts = result?.candidates?.[0]?.content?.parts;
+  if (!Array.isArray(parts)) {
+    return '';
+  }
+  return parts
+    .map((part) => {
+      if (typeof part.text === 'string') {
+        return part.text;
+      }
+      if (part.data && typeof part.data === 'string') {
+        return Buffer.from(part.data, 'base64').toString('utf8');
+      }
+      return '';
+    })
+    .filter(Boolean)
+    .join('\n')
+    .trim();
+};
+
+const parseGeminiJson = (result) => {
+  const raw = extractTextFromGemini(result);
+  const parsed = safeJsonParse(raw);
+  return { raw, parsed };
+};
+
+const asStringArray = (value) => {
+  if (Array.isArray(value)) {
+    return value.map((item) => item != null ? String(item) : '').filter((item) => item.trim().length > 0);
+  }
+  return [];
+};
+
 const normalizeBadgeKey = (key = '') => key.trim().toLowerCase();
 const getBadgeIcon = (key = '') => {
   const normalizedKey = normalizeBadgeKey(key);
@@ -213,6 +550,77 @@ const userSchema = new mongoose.Schema({
     endDate: { type: Date, default: null },
     updatedAt: { type: Date, default: null },
     plan: { type: String, default: PRO_PLAN_DEFAULT },
+  },
+  aiUsage: {
+    scan: {
+      dailyCount: { type: Number, default: 0 },
+      totalCount: { type: Number, default: 0 },
+      lastReset: { type: Date, default: null },
+    },
+    voice: {
+      dailyCount: { type: Number, default: 0 },
+      totalCount: { type: Number, default: 0 },
+      lastReset: { type: Date, default: null },
+    },
+    chat: {
+      dailyCount: { type: Number, default: 0 },
+      totalCount: { type: Number, default: 0 },
+      lastReset: { type: Date, default: null },
+    },
+  },
+  aiHistory: {
+    scan: {
+      type: [
+        new mongoose.Schema({
+          id: { type: String, required: true },
+          summary: { type: String, default: '' },
+          keyPoints: { type: [String], default: [] },
+          questions: { type: [String], default: [] },
+          createdAt: { type: Date, default: Date.now },
+        }, { _id: false })
+      ],
+      default: [],
+    },
+    voice: {
+      type: [
+        new mongoose.Schema({
+          id: { type: String, required: true },
+          transcription: { type: String, default: '' },
+          summary: { type: String, default: '' },
+          keyPoints: { type: [String], default: [] },
+          questions: { type: [String], default: [] },
+          createdAt: { type: Date, default: Date.now },
+        }, { _id: false })
+      ],
+      default: [],
+    },
+    chat: {
+      type: [
+        new mongoose.Schema({
+          id: { type: String, required: true },
+          userMessage: { type: String, required: true },
+          aiResponse: { type: String, required: true },
+          attachments: {
+            type: [
+              new mongoose.Schema({
+                type: { type: String, default: 'image' },
+                mimeType: { type: String, default: '' },
+                data: { type: String, default: '' },
+              }, { _id: false })
+            ],
+            default: [],
+          },
+          createdAt: { type: Date, default: Date.now },
+        }, { _id: false })
+      ],
+      default: [],
+    },
+  },
+  streak: {
+    current: { type: Number, default: 0 },
+    longest: { type: Number, default: 0 },
+    lastActiveDate: { type: Date, default: null },
+    updatedAt: { type: Date, default: null },
   },
   createdAt: { type: Date, default: Date.now },
 }, { versionKey: false });
@@ -370,6 +778,10 @@ const buildUserResponse = async (userDoc) => {
   const user = userDoc.toObject ? userDoc.toObject() : { ...userDoc };
   const { password, ...rest } = user;
 
+  ensureAiUsageStructure(user);
+  ensureAiHistoryStructure(user);
+  ensureStreakStructure(user);
+
   if (rest.createdAt instanceof Date) {
     rest.createdAt = rest.createdAt.toISOString();
   }
@@ -386,10 +798,27 @@ const buildUserResponse = async (userDoc) => {
 
   const badgeDetails = await getBadgesDetailedForUid(user.uid);
 
+  const aiUsage = buildAllUsageResponses(user);
+  const aiStreak = serializeStreak(user.streak);
+  const aiHistoryCounts = AI_FEATURES.reduce((acc, feature) => {
+    const entries = Array.isArray(user.aiHistory?.[feature]) ? user.aiHistory[feature] : [];
+    acc[feature] = entries.length;
+    return acc;
+  }, {});
+
+  delete rest.aiUsage;
+  delete rest.aiHistory;
+  delete rest.streak;
+
   return {
     ...rest,
     badges: badgeDetails.map((badge) => badge.key),
     badgeDetails,
+    ai: {
+      usage: aiUsage,
+      streak: aiStreak,
+      historyCounts: aiHistoryCounts,
+    },
   };
 };
 
@@ -577,8 +1006,8 @@ app.get('/admin/ai/gemini-key', authenticateJWT, isAdmin, async (req, res) => {
 });
 
 // --- AI Proxy (Gemini) ---
-const callGemini = (apiKey, payload) => new Promise((resolve, reject) => {
-  const path = `/v1beta/models/gemini-2.0-flash-preview-12-20:generateContent?key=${encodeURIComponent(apiKey)}`;
+const callGemini = (apiKey, payload, model = GEMINI_MODEL) => new Promise((resolve, reject) => {
+  const path = `/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
   const options = {
     hostname: 'generativelanguage.googleapis.com',
     method: 'POST',
@@ -631,86 +1060,394 @@ const parseAnalysisResponse = (responseText = '') => {
   return { summary: summary.trim(), keyPoints: keyPoints.slice(0, 5), questions: questions.slice(0, 5) };
 };
 
-app.post('/ai/analyze-image', async (req, res) => {
+const buildKnowledgeSections = (parsed, rawText) => {
+  const result = {
+    summary: '',
+    keyPoints: [],
+    questions: [],
+  };
+
+  if (parsed && typeof parsed === 'object') {
+    if (parsed.summary) {
+      result.summary = String(parsed.summary).trim();
+    }
+    if (Array.isArray(parsed.keyPoints)) {
+      result.keyPoints = asStringArray(parsed.keyPoints).slice(0, 6);
+    }
+    if (Array.isArray(parsed.questions)) {
+      result.questions = asStringArray(parsed.questions).slice(0, 6);
+    }
+  }
+
+  if (!result.summary || result.keyPoints.length === 0 || result.questions.length === 0) {
+    const fallback = parseAnalysisResponse(rawText || '');
+    if (!result.summary) result.summary = fallback.summary;
+    if (result.keyPoints.length === 0) result.keyPoints = fallback.keyPoints;
+    if (result.questions.length === 0) result.questions = fallback.questions;
+  }
+
+  return result;
+};
+
+const buildScanResult = (parsed, rawText) => {
+  const sections = buildKnowledgeSections(parsed, rawText);
+  return {
+    summary: sections.summary,
+    keyPoints: sections.keyPoints,
+    questions: sections.questions,
+    raw: rawText || '',
+  };
+};
+
+const buildVoiceResult = (parsed, rawText) => {
+  const sections = buildKnowledgeSections(parsed, rawText);
+  const transcription = parsed && typeof parsed === 'object' && parsed.transcription
+    ? String(parsed.transcription).trim()
+    : rawText || '';
+  return {
+    transcription,
+    summary: sections.summary,
+    keyPoints: sections.keyPoints,
+    questions: sections.questions,
+    raw: rawText || '',
+  };
+};
+
+const FEATURE_LABELS = {
+  scan: 'сканирования',
+  voice: 'AI диктофона',
+  chat: 'AI чата',
+};
+
+app.get('/ai/usage/:userId', async (req, res) => {
   try {
-    const { mimeType, base64Image, prompt } = req.body || {};
-    if (!mimeType || !base64Image) {
-      return res.status(400).json({ message: 'mimeType и base64Image обязательны' });
+    const { feature } = req.query || {};
+    const user = await loadAiUser(req.params.userId);
+    if (feature && !AI_FEATURES.includes(feature)) {
+      return res.status(400).json({ message: 'Некорректный тип функции' });
     }
-    const apiKey = await loadGeminiKey();
-    if (!apiKey) {
-      return res.status(503).json({ message: 'Gemini API ключ не настроен' });
-    }
-    const payload = {
-      contents: [
-        { parts: [
-          { text: (prompt && String(prompt).trim()) || 'Проанализируй этот конспект. Предоставь краткую сводку (не более 150 слов), ключевые моменты (3-5 пунктов) и возможные вопросы для теста (3-5 вопросов). Ответь на русском языке.' },
-          { inlineData: { mimeType, data: base64Image } }
-        ]}
-      ],
-      generationConfig: { temperature: 0.7, topK: 40, topP: 0.95, maxOutputTokens: 1024 }
-    };
-    const result = await callGemini(apiKey, payload);
-    const text = result?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    return res.json(parseAnalysisResponse(text));
+    return res.json({
+      success: true,
+      data: feature ? buildAiMeta(user, feature) : buildAiMeta(user),
+    });
   } catch (error) {
-    console.error('[AI][ERROR] analyze-image', error);
-    return res.status(500).json({ message: 'Ошибка анализа изображения' });
+    console.error('[AI][ERROR] usage', error);
+    const status = error.statusCode || 500;
+    return res.status(status).json({ message: error.message || 'Не удалось получить usage' });
   }
 });
 
-app.post('/ai/analyze-text', async (req, res) => {
+app.get('/ai/history/:userId', async (req, res) => {
   try {
-    const { transcription, prompt } = req.body || {};
-    if (!transcription || typeof transcription !== 'string') {
-      return res.status(400).json({ message: 'transcription обязателен' });
+    const { feature, limit } = req.query || {};
+    const user = await loadAiUser(req.params.userId);
+    const normalizedLimit = Number(limit);
+    const mapperScan = (entry) => ({
+      id: entry.id,
+      summary: entry.summary || '',
+      keyPoints: asStringArray(entry.keyPoints),
+      questions: asStringArray(entry.questions),
+      mimeType: entry.mimeType || '',
+      prompt: entry.prompt || '',
+      raw: entry.raw || '',
+      createdAt: entry.createdAt,
+    });
+    const mapperVoice = (entry) => ({
+      id: entry.id,
+      transcription: entry.transcription || '',
+      summary: entry.summary || '',
+      keyPoints: asStringArray(entry.keyPoints),
+      questions: asStringArray(entry.questions),
+      mimeType: entry.mimeType || '',
+      raw: entry.raw || '',
+      createdAt: entry.createdAt,
+    });
+    const mapperChat = (entry) => ({
+      id: entry.id,
+      userMessage: entry.userMessage || '',
+      aiResponse: entry.aiResponse || '',
+      attachments: Array.isArray(entry.attachments) ? entry.attachments.map((att) => ({
+        type: att.type || 'image',
+        mimeType: att.mimeType || '',
+        data: att.data || '',
+      })) : [],
+      createdAt: entry.createdAt,
+    });
+
+    const limitValue = Number.isFinite(normalizedLimit) && normalizedLimit > 0 ? normalizedLimit : undefined;
+
+    if (feature) {
+      if (!AI_FEATURES.includes(feature)) {
+        return res.status(400).json({ message: 'Некорректный тип функции' });
+      }
+      const historyEntries = user.aiHistory?.[feature] || [];
+      const mapper = feature === 'scan' ? mapperScan : feature === 'voice' ? mapperVoice : mapperChat;
+      return res.json({
+        success: true,
+        data: serializeHistoryList(historyEntries, mapper, limitValue),
+        ai: buildAiMeta(user, feature),
+      });
     }
+
+    return res.json({
+      success: true,
+      data: {
+        scan: serializeHistoryList(user.aiHistory?.scan || [], mapperScan, limitValue),
+        voice: serializeHistoryList(user.aiHistory?.voice || [], mapperVoice, limitValue),
+        chat: serializeHistoryList(user.aiHistory?.chat || [], mapperChat, limitValue),
+      },
+      ai: buildAiMeta(user),
+    });
+  } catch (error) {
+    console.error('[AI][ERROR] history', error);
+    const status = error.statusCode || 500;
+    return res.status(status).json({ message: error.message || 'Не удалось получить историю' });
+  }
+});
+
+app.post('/ai/scan', async (req, res) => {
+  try {
+    const { userId, mimeType, base64Image, prompt } = req.body || {};
+    if (!userId || !base64Image) {
+      return res.status(400).json({ message: 'userId и base64Image обязательны' });
+    }
+
+    const user = await loadAiUser(userId);
+    const usageCheck = checkUsageLimit(user, 'scan');
+    if (!usageCheck.allowed) {
+      return res.status(429).json(buildLimitError(FEATURE_LABELS.scan, buildAiMeta(user, 'scan')));
+    }
+
     const apiKey = await loadGeminiKey();
     if (!apiKey) {
       return res.status(503).json({ message: 'Gemini API ключ не настроен' });
     }
+
+    const instructionParts = [SCAN_SYSTEM_PROMPT];
+    if (prompt && String(prompt).trim().length > 0) {
+      instructionParts.push(`Дополнительные указания пользователя: ${String(prompt).trim()}`);
+    }
+
     const payload = {
-      contents: [ { parts: [ { text: `Проанализируй эту расшифровку лекции: "${transcription}". Предоставь краткую сводку (не более 150 слов), ключевые моменты (3-5 пунктов) и возможные вопросы для теста (3-5 вопросов). Ответь на русском языке.` } ] } ],
-      generationConfig: { temperature: 0.7, topK: 40, topP: 0.95, maxOutputTokens: 1024 }
+      systemInstruction: { parts: [{ text: instructionParts.join('\n\n') }] },
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            { text: 'Вот конспект. Выполни анализ согласно инструкциям.' },
+            { inlineData: { mimeType: mimeType || 'image/jpeg', data: base64Image } },
+          ],
+        },
+      ],
+      generationConfig: { temperature: 0.6, topK: 40, topP: 0.95, maxOutputTokens: 1024 },
     };
-    const result = await callGemini(apiKey, payload);
-    const text = result?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    return res.json(parseAnalysisResponse(text));
+
+    const geminiResult = await callGemini(apiKey, payload);
+    const { raw, parsed } = parseGeminiJson(geminiResult);
+    const analysis = buildScanResult(parsed, raw);
+
+    incrementUsage(user, 'scan');
+    updateUserStreak(user);
+    appendHistoryEntry(user, 'scan', {
+      id: generateEntryId(),
+      summary: analysis.summary,
+      keyPoints: analysis.keyPoints,
+      questions: analysis.questions,
+      prompt: prompt ? String(prompt) : '',
+      mimeType: mimeType || 'image/jpeg',
+      raw: analysis.raw,
+      createdAt: new Date(),
+    });
+
+    await user.save();
+
+    return res.json({
+      success: true,
+      data: {
+        summary: analysis.summary,
+        keyPoints: analysis.keyPoints,
+        questions: analysis.questions,
+      },
+      ai: buildAiMeta(user, 'scan'),
+    });
   } catch (error) {
-    console.error('[AI][ERROR] analyze-text', error);
-    return res.status(500).json({ message: 'Ошибка анализа текста' });
+    console.error('[AI][ERROR] scan', error);
+    const status = error.statusCode || 500;
+    return res.status(status).json({ message: error.message || 'Ошибка анализа изображения' });
+  }
+});
+
+app.post('/ai/voice', async (req, res) => {
+  try {
+    const { userId, mimeType, base64Audio, prompt } = req.body || {};
+    if (!userId || !base64Audio) {
+      return res.status(400).json({ message: 'userId и base64Audio обязательны' });
+    }
+
+    const user = await loadAiUser(userId);
+    const usageCheck = checkUsageLimit(user, 'voice');
+    if (!usageCheck.allowed) {
+      return res.status(429).json(buildLimitError(FEATURE_LABELS.voice, buildAiMeta(user, 'voice')));
+    }
+
+    const apiKey = await loadGeminiKey();
+    if (!apiKey) {
+      return res.status(503).json({ message: 'Gemini API ключ не настроен' });
+    }
+
+    const instructionParts = [VOICE_SYSTEM_PROMPT];
+    if (prompt && String(prompt).trim().length > 0) {
+      instructionParts.push(`Дополнительные указания пользователя: ${String(prompt).trim()}`);
+    }
+
+    const payload = {
+      systemInstruction: { parts: [{ text: instructionParts.join('\n\n') }] },
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            { text: 'Вот аудиозапись лекции. Сделай расшифровку и анализ.' },
+            { inlineData: { mimeType: mimeType || 'audio/mp3', data: base64Audio } },
+          ],
+        },
+      ],
+      generationConfig: { temperature: 0.7, topK: 40, topP: 0.9, maxOutputTokens: 2048 },
+    };
+
+    const geminiResult = await callGemini(apiKey, payload);
+    const { raw, parsed } = parseGeminiJson(geminiResult);
+    const voiceData = buildVoiceResult(parsed, raw);
+
+    incrementUsage(user, 'voice');
+    updateUserStreak(user);
+    appendHistoryEntry(user, 'voice', {
+      id: generateEntryId(),
+      transcription: voiceData.transcription,
+      summary: voiceData.summary,
+      keyPoints: voiceData.keyPoints,
+      questions: voiceData.questions,
+      mimeType: mimeType || 'audio/mp3',
+      raw: voiceData.raw,
+      createdAt: new Date(),
+    });
+
+    await user.save();
+
+    return res.json({
+      success: true,
+      data: {
+        transcription: voiceData.transcription,
+        summary: voiceData.summary,
+        keyPoints: voiceData.keyPoints,
+        questions: voiceData.questions,
+      },
+      ai: buildAiMeta(user, 'voice'),
+    });
+  } catch (error) {
+    console.error('[AI][ERROR] voice', error);
+    const status = error.statusCode || 500;
+    return res.status(status).json({ message: error.message || 'Ошибка обработки аудио' });
   }
 });
 
 app.post('/ai/chat', async (req, res) => {
   try {
-    const { message, history } = req.body || {};
-    if (!message || typeof message !== 'string') {
-      return res.status(400).json({ message: 'message обязателен' });
+    const { userId, message, history, attachments } = req.body || {};
+    if (!userId || !message || typeof message !== 'string') {
+      return res.status(400).json({ message: 'userId и message обязательны' });
     }
+
+    const user = await loadAiUser(userId);
+    const usageCheck = checkUsageLimit(user, 'chat');
+    if (!usageCheck.allowed) {
+      return res.status(429).json(buildLimitError(FEATURE_LABELS.chat, buildAiMeta(user, 'chat')));
+    }
+
     const apiKey = await loadGeminiKey();
     if (!apiKey) {
       return res.status(503).json({ message: 'Gemini API ключ не настроен' });
     }
+
+    const buildPartsFromMessage = (msg) => {
+      const parts = [];
+      if (msg.text && String(msg.text).trim().length > 0) {
+        parts.push({ text: String(msg.text) });
+      }
+      if (Array.isArray(msg.attachments)) {
+        for (const attachment of msg.attachments) {
+          if (!attachment || !attachment.data) continue;
+          parts.push({ inlineData: { mimeType: attachment.mimeType || 'image/jpeg', data: attachment.data } });
+        }
+      }
+      return parts;
+    };
+
     const contents = [];
     if (Array.isArray(history)) {
       for (const msg of history) {
-        if (!msg || typeof msg.text !== 'string' || typeof msg.sender !== 'string') continue;
-        contents.push({ parts: [{ text: msg.text }], role: msg.sender === 'user' ? 'user' : 'model' });
+        if (!msg || typeof msg.sender !== 'string') continue;
+        const role = msg.sender === 'user' ? 'user' : 'model';
+        const parts = buildPartsFromMessage(msg);
+        if (parts.length === 0) continue;
+        contents.push({ role, parts });
       }
     }
-    contents.push({ parts: [{ text: message }], role: 'user' });
+
+    const currentMessageParts = buildPartsFromMessage({ text: message, attachments });
+    contents.push({ role: 'user', parts: currentMessageParts });
+
     const payload = {
+      systemInstruction: { parts: [{ text: CHAT_SYSTEM_PROMPT }] },
       contents,
-      generationConfig: { temperature: 0.9, topK: 40, topP: 0.95, maxOutputTokens: 1024 },
-      systemInstruction: { parts: [{ text: 'Ты - AI-репетитор StudyMate. Помогай студентам с учебой, отвечай на вопросы, объясняй сложные концепции простым языком. Будь дружелюбным и поддерживающим. Отвечай на русском языке.' }] }
+      generationConfig: { temperature: 0.85, topK: 40, topP: 0.95, maxOutputTokens: 1024 },
     };
-    const result = await callGemini(apiKey, payload);
-    const text = result?.candidates?.[0]?.content?.parts?.[0]?.text || 'Извините, не удалось получить ответ.';
-    return res.json({ text });
+
+    const geminiResult = await callGemini(apiKey, payload);
+    const aiText = extractTextFromGemini(geminiResult) || 'Извините, не удалось получить ответ.';
+
+    incrementUsage(user, 'chat');
+    updateUserStreak(user);
+    appendHistoryEntry(user, 'chat', {
+      id: generateEntryId(),
+      userMessage: message,
+      aiResponse: aiText,
+      attachments: Array.isArray(attachments) ? attachments.map((attachment) => ({
+        type: attachment.type || 'image',
+        mimeType: attachment.mimeType || 'image/jpeg',
+        data: attachment.data || '',
+      })) : [],
+      createdAt: new Date(),
+    });
+
+    await user.save();
+
+    return res.json({
+      success: true,
+      data: { text: aiText },
+      ai: buildAiMeta(user, 'chat'),
+    });
   } catch (error) {
     console.error('[AI][ERROR] chat', error);
-    return res.status(500).json({ message: 'Ошибка в чате' });
+    const status = error.statusCode || 500;
+    return res.status(status).json({ message: error.message || 'Ошибка в чате' });
+  }
+});
+
+app.get('/ai/dashboard/:userId', async (req, res) => {
+  try {
+    const user = await loadAiUser(req.params.userId);
+    return res.json({
+      success: true,
+      data: {
+        usage: buildAllUsageResponses(user),
+        streak: serializeStreak(user.streak),
+        historyCounts: buildHistoryCounts(user),
+      },
+    });
+  } catch (error) {
+    console.error('[AI][ERROR] dashboard', error);
+    const status = error.statusCode || 500;
+    return res.status(status).json({ message: error.message || 'Не удалось получить данные AI' });
   }
 });
 
@@ -1636,28 +2373,6 @@ app.get('/health', (req, res) => {
     currentVersion: serverVersion,
     latestVersion: latestVersionInfo,
     uptime: Math.floor((Date.now() - startTime) / 1000) // in seconds
-  });
-});
-
-// Download APK endpoint
-app.get('/download-apk', (req, res) => {
-  const apkPath = path.join(__dirname, 'apk', 'app-release.apk');
-
-  // Check if file exists
-  if (!fs.existsSync(apkPath)) {
-    return res.status(404).json({ message: 'APK файл не найден' });
-  }
-
-  // Set headers for download
-  res.setHeader('Content-Type', 'application/vnd.android.package-archive');
-  res.setHeader('Content-Disposition', 'attachment; filename="aistudymate.apk"');
-
-  // Send the file
-  res.download(apkPath, 'aistudymate.apk', (err) => {
-    if (err) {
-      console.error('[DOWNLOAD][ERROR] Не удалось скачать APK:', err);
-      res.status(500).json({ message: 'Ошибка при скачивании APK' });
-    }
   });
 });
 
