@@ -1245,8 +1245,25 @@ app.post('/ai/scan', async (req, res) => {
     };
 
     const geminiResult = await callGemini(apiKey, payload);
+    console.log('[AI][Scan] Gemini response received:', JSON.stringify(geminiResult).slice(0, 500));
+    
     const { raw, parsed } = parseGeminiJson(geminiResult);
+    console.log('[AI][Scan] Parsed data:', { 
+      rawLength: raw?.length || 0, 
+      parsedType: typeof parsed,
+      hasSummary: !!parsed?.summary 
+    });
+    
     const analysis = buildScanResult(parsed, raw);
+    console.log('[AI][Scan] Final analysis:', {
+      summaryLength: analysis.summary?.length || 0,
+      keyPointsCount: analysis.keyPoints?.length || 0,
+      questionsCount: analysis.questions?.length || 0,
+    });
+
+    if (!analysis.summary || analysis.summary.length === 0) {
+      console.warn('[AI][Scan] WARNING: Empty summary from Gemini');
+    }
 
     incrementUsage(user, 'scan');
     updateUserStreak(user);
@@ -1317,8 +1334,26 @@ app.post('/ai/voice', async (req, res) => {
     };
 
     const geminiResult = await callGemini(apiKey, payload);
+    console.log('[AI][Voice] Gemini response received:', JSON.stringify(geminiResult).slice(0, 500));
+    
     const { raw, parsed } = parseGeminiJson(geminiResult);
+    console.log('[AI][Voice] Parsed data:', { 
+      rawLength: raw?.length || 0, 
+      parsedType: typeof parsed,
+      hasTranscription: !!parsed?.transcription 
+    });
+    
     const voiceData = buildVoiceResult(parsed, raw);
+    console.log('[AI][Voice] Final voice data:', {
+      transcriptionLength: voiceData.transcription?.length || 0,
+      summaryLength: voiceData.summary?.length || 0,
+      keyPointsCount: voiceData.keyPoints?.length || 0,
+      questionsCount: voiceData.questions?.length || 0,
+    });
+
+    if (!voiceData.transcription || voiceData.transcription.length === 0) {
+      console.warn('[AI][Voice] WARNING: Empty transcription from Gemini');
+    }
 
     incrementUsage(user, 'voice');
     updateUserStreak(user);
@@ -1405,7 +1440,14 @@ app.post('/ai/chat', async (req, res) => {
     };
 
     const geminiResult = await callGemini(apiKey, payload);
+    console.log('[AI][Chat] Gemini response received:', JSON.stringify(geminiResult).slice(0, 500));
+    
     const aiText = extractTextFromGemini(geminiResult) || 'Извините, не удалось получить ответ.';
+    console.log('[AI][Chat] Extracted text length:', aiText?.length || 0);
+
+    if (!aiText || aiText.trim().length === 0 || aiText === 'Извините, не удалось получить ответ.') {
+      console.warn('[AI][Chat] WARNING: Empty or fallback response from Gemini');
+    }
 
     incrementUsage(user, 'chat');
     updateUserStreak(user);
