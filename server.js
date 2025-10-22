@@ -2032,14 +2032,60 @@ app.get('/apk/download', (req, res) => {
     return res.status(404).json({ message: 'APK файл не найден' });
   }
 
-  res.download(APK_FILE_PATH, 'AIStudyMate.apk', (err) => {
-    if (err) {
-      console.error('[APK][ERROR] Ошибка скачивания:', err);
-      if (!res.headersSent) {
-        res.status(500).json({ message: 'Ошибка скачивания APK' });
+  try {
+    const stat = fs.statSync(APK_FILE_PATH);
+    const fileSize = stat.size;
+    const range = req.headers.range;
+
+    const baseHeaders = {
+      'Content-Type': 'application/vnd.android.package-archive',
+      'Accept-Ranges': 'bytes',
+      'Content-Disposition': 'attachment; filename="AIStudyMate.apk"',
+    };
+
+    if (range) {
+      const parts = range.replace(/bytes=| /g, '').split('-');
+      const start = parseInt(parts[0], 10);
+      const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+
+      if (isNaN(start) || isNaN(end) || start >= fileSize || end >= fileSize) {
+        return res.status(416).set({ 'Content-Range': `bytes */${fileSize}` }).end();
       }
+
+      const chunkSize = end - start + 1;
+      res.writeHead(206, {
+        ...baseHeaders,
+        'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+        'Content-Length': chunkSize,
+      });
+
+      const stream = fs.createReadStream(APK_FILE_PATH, { start, end });
+      stream.on('error', (err) => {
+        console.error('[APK][ERROR] Ошибка чтения файла (Range):', err);
+        res.destroy(err);
+      });
+      stream.pipe(res);
+    } else {
+      res.writeHead(200, {
+        ...baseHeaders,
+        'Content-Length': fileSize,
+      });
+
+      const stream = fs.createReadStream(APK_FILE_PATH);
+      stream.on('error', (err) => {
+        console.error('[APK][ERROR] Ошибка чтения файла:', err);
+        res.destroy(err);
+      });
+      stream.pipe(res);
     }
-  });
+  } catch (error) {
+    console.error('[APK][ERROR] Ошибка скачивания:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ message: 'Ошибка скачивания APK' });
+    } else {
+      res.end();
+    }
+  }
 });
 
 // Check if APK exists
