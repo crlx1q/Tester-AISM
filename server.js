@@ -442,7 +442,14 @@ const extractTextFromGemini = (result) => {
 };
 
 const parseGeminiJson = (result) => {
-  const raw = extractTextFromGemini(result);
+  let raw = extractTextFromGemini(result);
+  
+  // Убираем markdown обертки (```json, ```, ```javascript и т.д.)
+  raw = raw.replace(/```json\s*/gi, '').replace(/```javascript\s*/gi, '').replace(/```\s*/g, '');
+  
+  // Убираем возможные лишние пробелы в начале и конце
+  raw = raw.trim();
+  
   const parsed = safeJsonParse(raw);
   return { raw, parsed };
 };
