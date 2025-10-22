@@ -15,6 +15,7 @@ const crypto = require('crypto');
 const rateLimit = require('express-rate-limit');
 const bcrypt = require('bcrypt');
 const mongoose = require('mongoose');
+const multer = require('multer');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -1964,6 +1965,101 @@ app.get('/health', (req, res) => {
     message: 'Server is running',
     currentVersion: serverVersion,
     latestVersion: latestVersionInfo,
+  });
+});
+
+// APK storage configuration
+const APK_DIR = path.join(__dirname, 'apk');
+const APK_FILE_PATH = path.join(APK_DIR, 'app-release.apk');
+
+// Ensure APK directory exists
+if (!fs.existsSync(APK_DIR)) {
+  fs.mkdirSync(APK_DIR, { recursive: true });
+  console.log('[BOOT] Создана директория для APK:', APK_DIR);
+}
+
+// Multer configuration for APK upload
+const apkStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, APK_DIR);
+  },
+  filename: (req, file, cb) => {
+    cb(null, 'app-release.apk');
+  }
+});
+
+const apkUpload = multer({
+  storage: apkStorage,
+  limits: { fileSize: 200 * 1024 * 1024 }, // 200MB limit
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'application/vnd.android.package-archive' || file.originalname.endsWith('.apk')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Только APK файлы разрешены'));
+    }
+  }
+});
+
+// Upload APK endpoint
+app.post('/admin/upload-apk', authenticateJWT, isAdmin, apkUpload.single('apk'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'APK файл не загружен' });
+    }
+
+    const fileSize = req.file.size;
+    const fileSizeMB = (fileSize / (1024 * 1024)).toFixed(2);
+
+    console.log(`[ADMIN] APK загружен: ${req.file.filename}, размер: ${fileSizeMB} MB`);
+
+    res.json({
+      success: true,
+      message: 'APK успешно загружен',
+      filename: req.file.filename,
+      size: fileSize,
+      sizeMB: fileSizeMB,
+      downloadUrl: '/apk/download'
+    });
+  } catch (error) {
+    console.error('[ADMIN][ERROR] Ошибка загрузки APK:', error);
+    res.status(500).json({ success: false, message: 'Не удалось загрузить APK' });
+  }
+});
+
+// Download APK endpoint
+app.get('/apk/download', (req, res) => {
+  if (!fs.existsSync(APK_FILE_PATH)) {
+    return res.status(404).json({ message: 'APK файл не найден' });
+  }
+
+  res.download(APK_FILE_PATH, 'AIStudyMate.apk', (err) => {
+    if (err) {
+      console.error('[APK][ERROR] Ошибка скачивания:', err);
+      if (!res.headersSent) {
+        res.status(500).json({ message: 'Ошибка скачивания APK' });
+      }
+    }
+  });
+});
+
+// Check if APK exists
+app.get('/apk/status', (req, res) => {
+  const exists = fs.existsSync(APK_FILE_PATH);
+  let fileInfo = null;
+
+  if (exists) {
+    const stats = fs.statSync(APK_FILE_PATH);
+    fileInfo = {
+      size: stats.size,
+      sizeMB: (stats.size / (1024 * 1024)).toFixed(2),
+      uploadedAt: stats.mtime.toISOString()
+    };
+  }
+
+  res.json({
+    exists,
+    fileInfo,
+    downloadUrl: exists ? '/apk/download' : null
   });
 });
 

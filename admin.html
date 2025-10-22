@@ -291,8 +291,17 @@
                                         <input type="text" id="updateVersion" required class="w-full rounded-2xl border border-gray-200 bg-white/90 px-4 py-3 text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition" placeholder="1.2.0">
                                     </div>
                                     <div>
-                                        <label for="updateDownloadUrl" class="block text-sm font-semibold text-gray-600 mb-2">Ссылка на загрузку</label>
-                                        <input type="url" id="updateDownloadUrl" class="w-full rounded-2xl border border-gray-200 bg-white/90 px-4 py-3 text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition" placeholder="https://...">
+                                        <label for="apkFile" class="block text-sm font-semibold text-gray-600 mb-2">APK файл</label>
+                                        <input type="file" id="apkFile" accept=".apk" class="w-full rounded-2xl border border-gray-200 bg-white/90 px-4 py-3 text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                                        <div id="apkUploadProgress" class="mt-2 hidden">
+                                            <div class="flex items-center justify-between text-xs text-gray-600 mb-1">
+                                                <span id="apkUploadStatus">Загрузка...</span>
+                                                <span id="apkUploadPercent">0%</span>
+                                            </div>
+                                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                                <div id="apkUploadBar" class="bg-indigo-500 h-2 rounded-full transition-all" style="width: 0%"></div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                                 <div>
@@ -1136,14 +1145,69 @@
             publishUpdateBtn.classList.add('opacity-70');
             publishUpdateStatus.textContent = 'Публикуем обновление...';
 
-            const payload = {
-                version: document.getElementById('updateVersion').value,
-                title: document.getElementById('updateTitle').value,
-                message: document.getElementById('updateMessage').value,
-                downloadUrl: document.getElementById('updateDownloadUrl').value,
-            };
+            const apkFile = document.getElementById('apkFile').files[0];
+            let downloadUrl = '/apk/download'; // Default to server APK
 
             try {
+                // Upload APK if file is selected
+                if (apkFile) {
+                    const formData = new FormData();
+                    formData.append('apk', apkFile);
+
+                    const apkProgress = document.getElementById('apkUploadProgress');
+                    const apkStatus = document.getElementById('apkUploadStatus');
+                    const apkPercent = document.getElementById('apkUploadPercent');
+                    const apkBar = document.getElementById('apkUploadBar');
+
+                    apkProgress.classList.remove('hidden');
+                    apkStatus.textContent = 'Загрузка APK...';
+
+                    const xhr = new XMLHttpRequest();
+                    
+                    xhr.upload.addEventListener('progress', (e) => {
+                        if (e.lengthComputable) {
+                            const percent = Math.round((e.loaded / e.total) * 100);
+                            apkPercent.textContent = `${percent}%`;
+                            apkBar.style.width = `${percent}%`;
+                        }
+                    });
+
+                    const uploadPromise = new Promise((resolve, reject) => {
+                        xhr.onload = () => {
+                            if (xhr.status >= 200 && xhr.status < 300) {
+                                try {
+                                    const data = JSON.parse(xhr.responseText);
+                                    resolve(data);
+                                } catch (e) {
+                                    reject(new Error('Ошибка парсинга ответа'));
+                                }
+                            } else {
+                                reject(new Error('Ошибка загрузки APK'));
+                            }
+                        };
+                        xhr.onerror = () => reject(new Error('Ошибка сети'));
+                    });
+
+                    xhr.open('POST', `${API_BASE_URL}/admin/upload-apk`);
+                    xhr.send(formData);
+
+                    const uploadResult = await uploadPromise;
+                    downloadUrl = uploadResult.downloadUrl;
+                    
+                    apkStatus.textContent = `Загружено: ${uploadResult.sizeMB} MB`;
+                    showToast('APK успешно загружен', 'success');
+                    
+                    setTimeout(() => apkProgress.classList.add('hidden'), 2000);
+                }
+
+                // Publish update info
+                const payload = {
+                    version: document.getElementById('updateVersion').value,
+                    title: document.getElementById('updateTitle').value,
+                    message: document.getElementById('updateMessage').value,
+                    downloadUrl: downloadUrl,
+                };
+
                 const response = await fetch(`${API_BASE_URL}/admin/publish-update`, {
                     method: 'POST',
                     headers: {
