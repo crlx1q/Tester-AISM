@@ -450,7 +450,17 @@ const parseGeminiJson = (result) => {
   // Убираем возможные лишние пробелы в начале и конце
   raw = raw.trim();
   
-  const parsed = safeJsonParse(raw);
+  // Пробуем распарсить JSON
+  let parsed = safeJsonParse(raw);
+  
+  // Если не удалось распарсить, пробуем найти JSON в тексте
+  if (!parsed && raw) {
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      parsed = safeJsonParse(jsonMatch[0]);
+    }
+  }
+  
   return { raw, parsed };
 };
 
@@ -1076,19 +1086,29 @@ const buildKnowledgeSections = (parsed, rawText) => {
     questions: [],
   };
 
+  // Попытка извлечь из parsed JSON
   if (parsed && typeof parsed === 'object') {
-    if (parsed.summary) {
+    // Summary
+    if (parsed.summary && typeof parsed.summary === 'string') {
       result.summary = String(parsed.summary).trim();
     }
+    
+    // Key Points
     if (Array.isArray(parsed.keyPoints)) {
       result.keyPoints = asStringArray(parsed.keyPoints).slice(0, 6);
+    } else if (Array.isArray(parsed.key_points)) {
+      result.keyPoints = asStringArray(parsed.key_points).slice(0, 6);
     }
+    
+    // Questions
     if (Array.isArray(parsed.questions)) {
       result.questions = asStringArray(parsed.questions).slice(0, 6);
     }
   }
 
+  // Если JSON парсинг не сработал, пробуем парсить как текст
   if (!result.summary || result.keyPoints.length === 0 || result.questions.length === 0) {
+    console.log('[AI] JSON parse incomplete, trying text parsing. Summary:', !!result.summary, 'KeyPoints:', result.keyPoints.length, 'Questions:', result.questions.length);
     const fallback = parseAnalysisResponse(rawText || '');
     if (!result.summary) result.summary = fallback.summary;
     if (result.keyPoints.length === 0) result.keyPoints = fallback.keyPoints;
@@ -1110,9 +1130,22 @@ const buildScanResult = (parsed, rawText) => {
 
 const buildVoiceResult = (parsed, rawText) => {
   const sections = buildKnowledgeSections(parsed, rawText);
-  const transcription = parsed && typeof parsed === 'object' && parsed.transcription
-    ? String(parsed.transcription).trim()
-    : rawText || '';
+  
+  // Извлекаем транскрипцию из parsed или используем rawText
+  let transcription = '';
+  if (parsed && typeof parsed === 'object') {
+    if (parsed.transcription && typeof parsed.transcription === 'string') {
+      transcription = String(parsed.transcription).trim();
+    } else if (parsed.text && typeof parsed.text === 'string') {
+      transcription = String(parsed.text).trim();
+    }
+  }
+  
+  // Если транскрипции нет, используем rawText
+  if (!transcription && rawText) {
+    transcription = rawText;
+  }
+  
   return {
     transcription,
     summary: sections.summary,
@@ -1255,21 +1288,34 @@ app.post('/ai/scan', async (req, res) => {
     console.log('[AI][Scan] Gemini response received:', JSON.stringify(geminiResult).slice(0, 500));
     
     const { raw, parsed } = parseGeminiJson(geminiResult);
+    console.log('[AI][Scan] Raw text (first 300 chars):', raw?.slice(0, 300));
+    console.log('[AI][Scan] Parsed object:', JSON.stringify(parsed).slice(0, 500));
     console.log('[AI][Scan] Parsed data:', { 
       rawLength: raw?.length || 0, 
       parsedType: typeof parsed,
-      hasSummary: !!parsed?.summary 
+      hasSummary: !!parsed?.summary,
+      hasKeyPoints: !!parsed?.keyPoints,
+      hasQuestions: !!parsed?.questions
     });
     
     const analysis = buildScanResult(parsed, raw);
     console.log('[AI][Scan] Final analysis:', {
+      summary: analysis.summary?.slice(0, 100) + '...',
       summaryLength: analysis.summary?.length || 0,
       keyPointsCount: analysis.keyPoints?.length || 0,
       questionsCount: analysis.questions?.length || 0,
+      firstKeyPoint: analysis.keyPoints?.[0]?.slice(0, 50),
+      firstQuestion: analysis.questions?.[0]?.slice(0, 50),
     });
 
     if (!analysis.summary || analysis.summary.length === 0) {
       console.warn('[AI][Scan] WARNING: Empty summary from Gemini');
+    }
+    if (!analysis.keyPoints || analysis.keyPoints.length === 0) {
+      console.warn('[AI][Scan] WARNING: Empty keyPoints from Gemini');
+    }
+    if (!analysis.questions || analysis.questions.length === 0) {
+      console.warn('[AI][Scan] WARNING: Empty questions from Gemini');
     }
 
     incrementUsage(user, 'scan');
