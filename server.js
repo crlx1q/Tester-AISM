@@ -117,7 +117,7 @@ const PRO_PLAN_DEFAULT = 'free';
 const REGISTRATION_SETTINGS_KEY = 'registration';
 const SETTINGS_CACHE_TTL_MS = 30 * 1000;
 
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite';
 
 const AI_FEATURES = ['scan', 'voice', 'chat'];
 const DAILY_LIMITS = {
