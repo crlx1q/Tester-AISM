@@ -595,7 +595,7 @@ const userSchema = new mongoose.Schema({
           summary: { type: String, default: '' },
           keyPoints: { type: [String], default: [] },
           questions: { type: [String], default: [] },
-          createdAt: { type: Date, default: Date.now },
+          timestamp: { type: Date, default: Date.now },
         }, { _id: false })
       ],
       default: [],
@@ -655,10 +655,84 @@ const settingsSchema = new mongoose.Schema({
   value: { type: mongoose.Schema.Types.Mixed, default: {} },
 }, { versionKey: false });
 
+// Schema for saved scan notes 
+const scanNoteSchema = new mongoose.Schema({
+  id: { type: String, unique: true, required: true },
+  userId: { type: Number, required: true, index: true },
+  title: { type: String, required: true },
+  imageUrl: { type: String }, // Base64 image
+  summary: { type: String, default: '' },
+  keyPoints: { type: [String], default: [] },
+  questions: { type: [String], default: [] },
+  subject: { type: String, default: '' },
+  tags: { type: [String], default: [] },
+  flashcards: [{
+    question: { type: String },
+    answer: { type: String }
+  }],
+  favorite: { type: Boolean, default: false },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+}, { versionKey: false });
+
+// Schema for voice recordings with transcriptions
+const voiceRecordingSchema = new mongoose.Schema({
+  id: { type: String, unique: true, required: true },
+  userId: { type: Number, required: true, index: true },
+  title: { type: String, required: true },
+  duration: { type: String, required: true },
+  audioPath: { type: String },
+  transcription: { type: String, default: '' },
+  summary: { type: String, default: '' },
+  keyPoints: { type: [String], default: [] },
+  tags: { type: [String], default: [] },
+  favorite: { type: Boolean, default: false },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+}, { versionKey: false });
+
+// Schema for achievements
+const achievementSchema = new mongoose.Schema({
+  id: { type: String, unique: true, required: true },
+  userId: { type: Number, required: true, index: true },
+  type: { type: String, required: true }, // 'scans', 'recordings', 'streak', 'quiz', 'study_time'
+  name: { type: String, required: true },
+  description: { type: String },
+  icon: { type: String },
+  progress: { type: Number, default: 0 },
+  maxProgress: { type: Number, default: 100 },
+  completed: { type: Boolean, default: false },
+  completedAt: { type: Date },
+  createdAt: { type: Date, default: Date.now },
+}, { versionKey: false });
+
+// Schema for calendar events
+const calendarEventSchema = new mongoose.Schema({
+  id: { type: String, unique: true, required: true },
+  userId: { type: Number, required: true, index: true },
+  title: { type: String, required: true },
+  description: { type: String },
+  type: { type: String, default: 'study' }, // 'study', 'exam', 'homework', 'reminder'
+  date: { type: Date, required: true },
+  startTime: { type: String }, // "14:00"
+  endTime: { type: String }, // "16:00"
+  color: { type: String, default: '#6366F1' },
+  reminder: { type: Boolean, default: false },
+  reminderMinutes: { type: Number, default: 30 },
+  recurring: { type: String }, // 'daily', 'weekly', 'monthly'
+  completed: { type: Boolean, default: false },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+}, { versionKey: false });
+
 const Counter = mongoose.model('Counter', counterSchema);
 const User = mongoose.model('User', userSchema);
 const Badge = mongoose.model('Badge', badgeSchema);
 const Setting = mongoose.model('Setting', settingsSchema);
+const ScanNote = mongoose.model('ScanNote', scanNoteSchema);
+const VoiceRecording = mongoose.model('VoiceRecording', voiceRecordingSchema);
+const Achievement = mongoose.model('Achievement', achievementSchema);
+const CalendarEvent = mongoose.model('CalendarEvent', calendarEventSchema);
 
 mongoose.connection.on('error', (error) => {
   console.error('[MONGO][ERROR]', error);
@@ -1545,6 +1619,372 @@ app.get('/ai/dashboard/:userId', async (req, res) => {
     console.error('[AI][ERROR] dashboard', error);
     const status = error.statusCode || 500;
     return res.status(status).json({ message: error.message || 'Не удалось получить данные AI' });
+  }
+});
+
+// === Scan Notes Management ===
+app.post('/scans/save', async (req, res) => {
+  try {
+    const { userId, title, imageUrl, summary, keyPoints, questions, subject, tags, flashcards } = req.body;
+    
+    if (!userId || !title) {
+      return res.status(400).json({ success: false, message: 'userId и title обязательны' });
+    }
+
+    const id = `scan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    const scanNote = new ScanNote({
+      id,
+      userId: parseInt(userId, 10),
+      title,
+      imageUrl,
+      summary,
+      keyPoints,
+      questions,
+      subject,
+      tags,
+      flashcards,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    await scanNote.save();
+    
+    return res.json({ success: true, data: scanNote });
+  } catch (error) {
+    console.error('[SCANS][ERROR] save', error);
+    return res.status(500).json({ success: false, message: 'Ошибка сохранения конспекта' });
+  }
+});
+
+app.get('/scans/:userId', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId, 10);
+    const scans = await ScanNote.find({ userId }).sort({ createdAt: -1 }).lean();
+    return res.json({ success: true, data: scans });
+  } catch (error) {
+    console.error('[SCANS][ERROR] list', error);
+    return res.status(500).json({ success: false, message: 'Ошибка получения списка конспектов' });
+  }
+});
+
+app.get('/scans/:userId/:scanId', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId, 10);
+    const scanId = req.params.scanId;
+    const scan = await ScanNote.findOne({ id: scanId, userId }).lean();
+    
+    if (!scan) {
+      return res.status(404).json({ success: false, message: 'Конспект не найден' });
+    }
+    
+    return res.json({ success: true, data: scan });
+  } catch (error) {
+    console.error('[SCANS][ERROR] get', error);
+    return res.status(500).json({ success: false, message: 'Ошибка получения конспекта' });
+  }
+});
+
+app.put('/scans/:userId/:scanId', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId, 10);
+    const scanId = req.params.scanId;
+    const updates = req.body;
+    
+    updates.updatedAt = new Date();
+    
+    const scan = await ScanNote.findOneAndUpdate(
+      { id: scanId, userId },
+      { $set: updates },
+      { new: true }
+    ).lean();
+    
+    if (!scan) {
+      return res.status(404).json({ success: false, message: 'Конспект не найден' });
+    }
+    
+    return res.json({ success: true, data: scan });
+  } catch (error) {
+    console.error('[SCANS][ERROR] update', error);
+    return res.status(500).json({ success: false, message: 'Ошибка обновления конспекта' });
+  }
+});
+
+app.delete('/scans/:userId/:scanId', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId, 10);
+    const scanId = req.params.scanId;
+    
+    const result = await ScanNote.deleteOne({ id: scanId, userId });
+    
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ success: false, message: 'Конспект не найден' });
+    }
+    
+    return res.json({ success: true, message: 'Конспект удален' });
+  } catch (error) {
+    console.error('[SCANS][ERROR] delete', error);
+    return res.status(500).json({ success: false, message: 'Ошибка удаления конспекта' });
+  }
+});
+
+// === Voice Recordings Management ===
+app.post('/recordings/save', async (req, res) => {
+  try {
+    const { userId, title, duration, audioPath, transcription, summary, keyPoints, tags } = req.body;
+    
+    if (!userId || !title || !duration) {
+      return res.status(400).json({ success: false, message: 'userId, title и duration обязательны' });
+    }
+
+    const id = `voice_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    const recording = new VoiceRecording({
+      id,
+      userId: parseInt(userId, 10),
+      title,
+      duration,
+      audioPath,
+      transcription,
+      summary,
+      keyPoints,
+      tags,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    await recording.save();
+    
+    return res.json({ success: true, data: recording });
+  } catch (error) {
+    console.error('[RECORDINGS][ERROR] save', error);
+    return res.status(500).json({ success: false, message: 'Ошибка сохранения записи' });
+  }
+});
+
+app.get('/recordings/:userId', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId, 10);
+    const recordings = await VoiceRecording.find({ userId }).sort({ createdAt: -1 }).lean();
+    return res.json({ success: true, data: recordings });
+  } catch (error) {
+    console.error('[RECORDINGS][ERROR] list', error);
+    return res.status(500).json({ success: false, message: 'Ошибка получения списка записей' });
+  }
+});
+
+app.get('/recordings/:userId/:recordingId', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId, 10);
+    const recordingId = req.params.recordingId;
+    const recording = await VoiceRecording.findOne({ id: recordingId, userId }).lean();
+    
+    if (!recording) {
+      return res.status(404).json({ success: false, message: 'Запись не найдена' });
+    }
+    
+    return res.json({ success: true, data: recording });
+  } catch (error) {
+    console.error('[RECORDINGS][ERROR] get', error);
+    return res.status(500).json({ success: false, message: 'Ошибка получения записи' });
+  }
+});
+
+app.put('/recordings/:userId/:recordingId', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId, 10);
+    const recordingId = req.params.recordingId;
+    const updates = req.body;
+    
+    updates.updatedAt = new Date();
+    
+    const recording = await VoiceRecording.findOneAndUpdate(
+      { id: recordingId, userId },
+      { $set: updates },
+      { new: true }
+    ).lean();
+    
+    if (!recording) {
+      return res.status(404).json({ success: false, message: 'Запись не найдена' });
+    }
+    
+    return res.json({ success: true, data: recording });
+  } catch (error) {
+    console.error('[RECORDINGS][ERROR] update', error);
+    return res.status(500).json({ success: false, message: 'Ошибка обновления записи' });
+  }
+});
+
+app.delete('/recordings/:userId/:recordingId', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId, 10);
+    const recordingId = req.params.recordingId;
+    
+    const result = await VoiceRecording.deleteOne({ id: recordingId, userId });
+    
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ success: false, message: 'Запись не найдена' });
+    }
+    
+    return res.json({ success: true, message: 'Запись удалена' });
+  } catch (error) {
+    console.error('[RECORDINGS][ERROR] delete', error);
+    return res.status(500).json({ success: false, message: 'Ошибка удаления записи' });
+  }
+});
+
+// === Achievements Management ===
+app.get('/achievements/:userId', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId, 10);
+    const achievements = await Achievement.find({ userId }).sort({ createdAt: -1 }).lean();
+    
+    // Check and update achievements based on current stats
+    const scanCount = await ScanNote.countDocuments({ userId });
+    const recordingCount = await VoiceRecording.countDocuments({ userId });
+    
+    // First scan achievement
+    if (scanCount >= 1) {
+      await Achievement.findOneAndUpdate(
+        { userId, type: 'scans', name: 'Первый конспект' },
+        { 
+          $set: { 
+            progress: 1, 
+            maxProgress: 1, 
+            completed: true, 
+            completedAt: new Date(),
+            description: 'Создан первый конспект',
+            icon: 'trophy'
+          }
+        },
+        { upsert: true, setDefaultsOnInsert: { id: `ach_scan_first_${userId}` } }
+      );
+    }
+    
+    // 10 scans achievement
+    if (scanCount >= 10) {
+      await Achievement.findOneAndUpdate(
+        { userId, type: 'scans', name: 'Мастер конспектов' },
+        { 
+          $set: { 
+            progress: 10, 
+            maxProgress: 10, 
+            completed: true, 
+            completedAt: new Date(),
+            description: 'Создано 10 конспектов',
+            icon: 'award'
+          }
+        },
+        { upsert: true, setDefaultsOnInsert: { id: `ach_scan_10_${userId}` } }
+      );
+    }
+    
+    // Return updated achievements
+    const updatedAchievements = await Achievement.find({ userId }).sort({ createdAt: -1 }).lean();
+    return res.json({ success: true, data: updatedAchievements });
+  } catch (error) {
+    console.error('[ACHIEVEMENTS][ERROR] list', error);
+    return res.status(500).json({ success: false, message: 'Ошибка получения достижений' });
+  }
+});
+
+// === Calendar Events Management ===
+app.post('/calendar/events', async (req, res) => {
+  try {
+    const { userId, title, description, type, date, startTime, endTime, color, reminder, recurring } = req.body;
+    
+    if (!userId || !title || !date) {
+      return res.status(400).json({ success: false, message: 'userId, title и date обязательны' });
+    }
+    
+    const id = `event_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    const event = new CalendarEvent({
+      id,
+      userId: parseInt(userId, 10),
+      title,
+      description,
+      type: type || 'study',
+      date: new Date(date),
+      startTime,
+      endTime,
+      color: color || '#6366F1',
+      reminder: reminder || false,
+      recurring,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    
+    await event.save();
+    
+    return res.json({ success: true, data: event });
+  } catch (error) {
+    console.error('[CALENDAR][ERROR] create', error);
+    return res.status(500).json({ success: false, message: 'Ошибка создания события' });
+  }
+});
+
+app.get('/calendar/events/:userId', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId, 10);
+    const { start, end } = req.query;
+    
+    const query = { userId };
+    if (start && end) {
+      query.date = {
+        $gte: new Date(start),
+        $lte: new Date(end)
+      };
+    }
+    
+    const events = await CalendarEvent.find(query).sort({ date: 1 }).lean();
+    return res.json({ success: true, data: events });
+  } catch (error) {
+    console.error('[CALENDAR][ERROR] list', error);
+    return res.status(500).json({ success: false, message: 'Ошибка получения событий' });
+  }
+});
+
+app.put('/calendar/events/:userId/:eventId', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId, 10);
+    const eventId = req.params.eventId;
+    const updates = req.body;
+    
+    updates.updatedAt = new Date();
+    
+    const event = await CalendarEvent.findOneAndUpdate(
+      { id: eventId, userId },
+      { $set: updates },
+      { new: true }
+    ).lean();
+    
+    if (!event) {
+      return res.status(404).json({ success: false, message: 'Событие не найдено' });
+    }
+    
+    return res.json({ success: true, data: event });
+  } catch (error) {
+    console.error('[CALENDAR][ERROR] update', error);
+    return res.status(500).json({ success: false, message: 'Ошибка обновления события' });
+  }
+});
+
+app.delete('/calendar/events/:userId/:eventId', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId, 10);
+    const eventId = req.params.eventId;
+    
+    const result = await CalendarEvent.deleteOne({ id: eventId, userId });
+    
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ success: false, message: 'Событие не найдено' });
+    }
+    
+    return res.json({ success: true, message: 'Событие удалено' });
+  } catch (error) {
+    console.error('[CALENDAR][ERROR] delete', error);
+    return res.status(500).json({ success: false, message: 'Ошибка удаления события' });
   }
 });
 
