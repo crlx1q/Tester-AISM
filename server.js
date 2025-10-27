@@ -778,6 +778,18 @@ const notebookEntrySchema = new mongoose.Schema({
   manualNotes: { type: String, default: '' },
   createdAt: { type: Date, default: Date.now, index: true },
   updatedAt: { type: Date, default: Date.now },
+  // Расширенные поля для заметок
+  color: { type: Number },
+  icon: { type: Number },
+  priority: { type: String, enum: ['low', 'normal', 'high'], default: 'normal' },
+  reminderDate: { type: Date },
+  checklistItems: [{
+    id: { type: String, required: true },
+    text: { type: String, required: true },
+    isCompleted: { type: Boolean, default: false },
+  }],
+  attachments: { type: [String], default: [] },
+  isPinned: { type: Boolean, default: false },
 }, { versionKey: false });
 
 // Schema for AI Lectures (from voice recordings)
@@ -3494,7 +3506,10 @@ app.get('/notebook/:userId', async (req, res) => {
 app.post('/notebook/:userId', async (req, res) => {
   try {
     const userId = parseInt(req.params.userId, 10);
-    const { type, title, summary, tags, course, linkedResourceId, manualNotes } = req.body;
+    const {
+      type, title, summary, tags, course, linkedResourceId, manualNotes,
+      color, icon, priority, reminderDate, checklistItems, attachments, isPinned
+    } = req.body;
 
     if (!Number.isFinite(userId) || !type || !title) {
       return res.status(400).json({ message: 'Отсутствуют обязательные поля' });
@@ -3515,6 +3530,13 @@ app.post('/notebook/:userId', async (req, res) => {
       course: course || '',
       linkedResourceId,
       manualNotes: manualNotes || '',
+      color,
+      icon,
+      priority: priority || 'normal',
+      reminderDate,
+      checklistItems: checklistItems || [],
+      attachments: attachments || [],
+      isPinned: isPinned || false,
     });
 
     await entry.save();
@@ -3566,7 +3588,10 @@ app.put('/notebook/:userId/:entryId', async (req, res) => {
   try {
     const userId = parseInt(req.params.userId, 10);
     const { entryId } = req.params;
-    const { title, summary, tags, course, manualNotes } = req.body;
+    const {
+      title, summary, tags, course, manualNotes,
+      color, icon, priority, reminderDate, checklistItems, attachments, isPinned
+    } = req.body;
 
     if (!Number.isFinite(userId)) {
       return res.status(400).json({ message: 'Некорректный ID пользователя' });
@@ -3578,6 +3603,13 @@ app.put('/notebook/:userId/:entryId', async (req, res) => {
     if (tags) updateFields.tags = tags;
     if (course !== undefined) updateFields.course = course;
     if (manualNotes !== undefined) updateFields.manualNotes = manualNotes;
+    if (color !== undefined) updateFields.color = color;
+    if (icon !== undefined) updateFields.icon = icon;
+    if (priority !== undefined) updateFields.priority = priority;
+    if (reminderDate !== undefined) updateFields.reminderDate = reminderDate;
+    if (checklistItems !== undefined) updateFields.checklistItems = checklistItems;
+    if (attachments !== undefined) updateFields.attachments = attachments;
+    if (isPinned !== undefined) updateFields.isPinned = isPinned;
 
     const entry = await NotebookEntry.findOneAndUpdate(
       { id: entryId, userId },
