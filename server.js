@@ -4255,12 +4255,24 @@ ${context}
     console.log(`[AI][METADATA_CARDS] Generated ${cards.length} cards for "${title}"`);
 
     // Update AI usage stats
-    const updatedUser = await updateAiUsage(userId, 'chat');
+    incrementUsage(user, 'chat');
+    updateUserStreak(user);
+    appendHistoryEntry(user, 'chat', {
+      id: generateEntryId(),
+      type: 'cards_generation',
+      title: title,
+      course: course,
+      tags: tags || [],
+      cardsCount: cards.length,
+      createdAt: new Date(),
+    });
+    
+    await user.save();
     
     res.status(200).json({ 
       success: true, 
       data: { cards },
-      ai: buildAiMeta(updatedUser, 'chat')
+      ai: buildAiMeta(user, 'chat')
     });
   } catch (error) {
     console.error('[AI][METADATA_CARDS][ERROR]', error);
