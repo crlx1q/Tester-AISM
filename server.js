@@ -144,9 +144,11 @@ const SCAN_SYSTEM_PROMPT = `Ты — ИИ-тьютор StudyMate. Анализи
 {
   "summary": "краткое изложение (до 4-5 предложений)",
   "keyPoints": ["ключевой факт 1", "ключевой факт 2", ...],
+  "concepts": ["ключевое понятие/термин 1", "ключевое понятие/термин 2", ...],
+  "formulas": ["формула 1 (если есть)", "формула 2 (если есть)", ...],
   "questions": ["вопрос для самопроверки 1", ...]
 }
-В "keyPoints" и "questions" должно быть по 3-5 элементов.`;
+В "keyPoints" и "questions" должно быть по 3-5 элементов. В "concepts" укажи основные термины и понятия. В "formulas" укажи математические или научные формулы если они есть в конспекте.`;
 
 const VOICE_SYSTEM_PROMPT = `Ты — ИИ-тьютор StudyMate. Тебе передают аудиозапись лекции. Выполни точную расшифровку и анализ.
 Ответ в JSON:
@@ -154,8 +156,10 @@ const VOICE_SYSTEM_PROMPT = `Ты — ИИ-тьютор StudyMate. Тебе пе
   "transcription": "подробная расшифровка",
   "summary": "краткое изложение (до 4-5 предложений)",
   "keyPoints": ["ключевой факт 1", ...],
+  "keyConcepts": ["ключевое понятие 1", "ключевое понятие 2", ...],
   "questions": ["вопрос 1", ...]
 }
+В "keyPoints" и "questions" должно быть по 3-5 элементов. В "keyConcepts" укажи основные понятия и термины из лекции.
 Пиши на русском языке.`;
 
 const CHAT_SYSTEM_PROMPT = `Ты — AI-репетитор StudyMate. Отвечай дружелюбно, кратко и по делу.
@@ -725,6 +729,158 @@ const calendarEventSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now },
 }, { versionKey: false });
 
+// Schema for quiz results
+const quizResultSchema = new mongoose.Schema({
+  id: { type: String, unique: true, required: true },
+  userId: { type: Number, required: true, index: true },
+  setId: { type: String, required: true },
+  setTitle: { type: String, default: '' },
+  score: { type: Number, required: true }, // 0-100
+  totalQuestions: { type: Number, required: true },
+  correctAnswers: { type: Number, required: true },
+  durationSeconds: { type: Number, required: true },
+  answers: [{
+    question: { type: String },
+    userAnswer: { type: String },
+    correctAnswer: { type: String },
+    isCorrect: { type: Boolean },
+    timeSpent: { type: Number } // seconds
+  }],
+  createdAt: { type: Date, default: Date.now },
+}, { versionKey: false });
+
+// Schema for daily study statistics
+const studyStatsDailySchema = new mongoose.Schema({
+  userId: { type: Number, required: true, index: true },
+  date: { type: Date, required: true, index: true },
+  studyMinutes: { type: Number, default: 0 },
+  scansCount: { type: Number, default: 0 },
+  recordingsCount: { type: Number, default: 0 },
+  chatSessionsCount: { type: Number, default: 0 },
+  cardsCreated: { type: Number, default: 0 },
+  quizzesTaken: { type: Number, default: 0 },
+  updatedAt: { type: Date, default: Date.now },
+}, { versionKey: false });
+
+// Compound index for userId + date
+studyStatsDailySchema.index({ userId: 1, date: 1 }, { unique: true });
+
+// Schema for AI Notebook entries (unified)
+const notebookEntrySchema = new mongoose.Schema({
+  id: { type: String, unique: true, required: true },
+  userId: { type: Number, required: true, index: true },
+  type: { type: String, required: true, enum: ['scan', 'lecture', 'session', 'manual'], index: true },
+  title: { type: String, required: true },
+  summary: { type: String, default: '' },
+  tags: { type: [String], default: [], index: true },
+  course: { type: String, default: '', index: true },
+  linkedResourceId: { type: String }, // ID of AiLecture, AiScanNote, or AiSession
+  manualNotes: { type: String, default: '' },
+  createdAt: { type: Date, default: Date.now, index: true },
+  updatedAt: { type: Date, default: Date.now },
+}, { versionKey: false });
+
+// Schema for AI Lectures (from voice recordings)
+const aiLectureSchema = new mongoose.Schema({
+  id: { type: String, unique: true, required: true },
+  userId: { type: Number, required: true, index: true },
+  recordingId: { type: String }, // Reference to VoiceRecording if exists
+  title: { type: String, required: true },
+  durationSeconds: { type: Number, default: 0 },
+  transcription: { type: String, default: '' },
+  summary: { type: String, default: '' },
+  keyConcepts: { type: [String], default: [] },
+  questions: { type: [String], default: [] },
+  tags: { type: [String], default: [] },
+  course: { type: String, default: '' },
+  notebookEntryId: { type: String }, // Reference to NotebookEntry
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+}, { versionKey: false });
+
+// Schema for AI Scan Notes (extended version)
+const aiScanNoteSchema = new mongoose.Schema({
+  id: { type: String, unique: true, required: true },
+  userId: { type: Number, required: true, index: true },
+  title: { type: String, required: true },
+  imageUrl: { type: String },
+  summary: { type: String, default: '' },
+  keyPoints: { type: [String], default: [] },
+  concepts: { type: [String], default: [] }, // NEW: key concepts extracted
+  formulas: { type: [String], default: [] }, // NEW: formulas identified
+  questions: { type: [String], default: [] },
+  subject: { type: String, default: '' },
+  tags: { type: [String], default: [] },
+  course: { type: String, default: '' }, // NEW
+  manualNotes: { type: String, default: '' }, // NEW: user's additional notes
+  flashcards: [{
+    question: { type: String },
+    answer: { type: String }
+  }],
+  favorite: { type: Boolean, default: false },
+  notebookEntryId: { type: String }, // NEW: Reference to NotebookEntry
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+}, { versionKey: false });
+
+// Schema for AI Chat Sessions
+const aiSessionSchema = new mongoose.Schema({
+  id: { type: String, unique: true, required: true },
+  userId: { type: Number, required: true, index: true },
+  sessionId: { type: String }, // Optional session identifier
+  title: { type: String, default: 'Сессия с AI' },
+  goals: { type: [String], default: [] },
+  keyTakeaways: { type: [String], default: [] },
+  homework: { type: [String], default: [] },
+  suggestedNextSteps: { type: [String], default: [] },
+  messagesCount: { type: Number, default: 0 },
+  durationMinutes: { type: Number, default: 0 },
+  notebookEntryId: { type: String }, // Reference to NotebookEntry
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+}, { versionKey: false });
+
+// Schema for Study Planner Schedule
+const plannerScheduleSchema = new mongoose.Schema({
+  userId: { type: Number, required: true, unique: true, index: true },
+  weekStart: { type: Date, required: true, index: true }, // Monday of the current week
+  tasks: [{
+    id: { type: String, required: true },
+    date: { type: Date, required: true },
+    title: { type: String, required: true },
+    type: { type: String, enum: ['review_lecture', 'review_scan', 'quiz', 'reading', 'custom'], default: 'custom' },
+    relatedNotebookId: { type: String }, // Link to NotebookEntry
+    completed: { type: Boolean, default: false },
+    dueTime: { type: String }, // "14:00"
+    priority: { type: String, enum: ['low', 'medium', 'high'], default: 'medium' },
+  }],
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+}, { versionKey: false });
+
+// Schema for AI Insights (weekly reports)
+const aiInsightSchema = new mongoose.Schema({
+  id: { type: String, unique: true, required: true },
+  userId: { type: Number, required: true, index: true },
+  weekStart: { type: Date, required: true, index: true },
+  weekEnd: { type: Date, required: true },
+  learnedTopics: { type: [String], default: [] },
+  weakAreas: { type: [String], default: [] },
+  suggestedReviews: { type: [String], default: [] },
+  summary: { type: String, default: '' },
+  stats: {
+    totalStudyMinutes: { type: Number, default: 0 },
+    scansCompleted: { type: Number, default: 0 },
+    lecturesCompleted: { type: Number, default: 0 },
+    quizzesTaken: { type: Number, default: 0 },
+    averageScore: { type: Number, default: 0 },
+  },
+  createdAt: { type: Date, default: Date.now },
+}, { versionKey: false });
+
+// Compound index for userId + weekStart
+aiInsightSchema.index({ userId: 1, weekStart: 1 }, { unique: true });
+
 const Counter = mongoose.model('Counter', counterSchema);
 const User = mongoose.model('User', userSchema);
 const Badge = mongoose.model('Badge', badgeSchema);
@@ -733,6 +889,14 @@ const ScanNote = mongoose.model('ScanNote', scanNoteSchema);
 const VoiceRecording = mongoose.model('VoiceRecording', voiceRecordingSchema);
 const Achievement = mongoose.model('Achievement', achievementSchema);
 const CalendarEvent = mongoose.model('CalendarEvent', calendarEventSchema);
+const QuizResult = mongoose.model('QuizResult', quizResultSchema);
+const StudyStatsDaily = mongoose.model('StudyStatsDaily', studyStatsDailySchema);
+const NotebookEntry = mongoose.model('NotebookEntry', notebookEntrySchema);
+const AiLecture = mongoose.model('AiLecture', aiLectureSchema);
+const AiScanNote = mongoose.model('AiScanNote', aiScanNoteSchema);
+const AiSession = mongoose.model('AiSession', aiSessionSchema);
+const PlannerSchedule = mongoose.model('PlannerSchedule', plannerScheduleSchema);
+const AiInsight = mongoose.model('AiInsight', aiInsightSchema);
 
 mongoose.connection.on('error', (error) => {
   console.error('[MONGO][ERROR]', error);
@@ -1197,6 +1361,8 @@ const buildScanResult = (parsed, rawText) => {
   return {
     summary: sections.summary,
     keyPoints: sections.keyPoints,
+    concepts: asStringArray(parsed?.concepts || []),
+    formulas: asStringArray(parsed?.formulas || []),
     questions: sections.questions,
     raw: rawText || '',
   };
@@ -1224,6 +1390,7 @@ const buildVoiceResult = (parsed, rawText) => {
     transcription,
     summary: sections.summary,
     keyPoints: sections.keyPoints,
+    keyConcepts: asStringArray(parsed?.keyConcepts || []),
     questions: sections.questions,
     raw: rawText || '',
   };
@@ -1407,11 +1574,16 @@ app.post('/ai/scan', async (req, res) => {
 
     await user.save();
 
+    // Update stats automatically
+    await updateStats(userId, { scansCount: 1 });
+
     return res.json({
       success: true,
       data: {
         summary: analysis.summary,
         keyPoints: analysis.keyPoints,
+        concepts: analysis.concepts || [],
+        formulas: analysis.formulas || [],
         questions: analysis.questions,
       },
       ai: buildAiMeta(user, 'scan'),
@@ -1497,12 +1669,16 @@ app.post('/ai/voice', async (req, res) => {
 
     await user.save();
 
+    // Update stats automatically
+    await updateStats(userId, { recordingsCount: 1 });
+
     return res.json({
       success: true,
       data: {
         transcription: voiceData.transcription,
         summary: voiceData.summary,
         keyPoints: voiceData.keyPoints,
+        keyConcepts: voiceData.keyConcepts || [],
         questions: voiceData.questions,
       },
       ai: buildAiMeta(user, 'voice'),
@@ -1591,6 +1767,9 @@ app.post('/ai/chat', async (req, res) => {
     });
 
     await user.save();
+
+    // Update stats automatically
+    await updateStats(userId, { chatSessionsCount: 1 });
 
     return res.json({
       success: true,
@@ -3040,6 +3219,1053 @@ app.put('/profile/:userId/password', async (req, res) => {
   console.log(`Password updated for user ${user.email}`);
 
   res.status(200).json({ message: 'Пароль успешно изменен' });
+});
+
+// ========== QUIZ RESULTS API ==========
+
+// Save quiz result
+app.post('/quiz-results', async (req, res) => {
+  try {
+    const { userId, setId, setTitle, score, totalQuestions, correctAnswers, durationSeconds, answers } = req.body;
+    
+    if (!userId || !setId || score == null || !totalQuestions) {
+      return res.status(400).json({ message: 'Отсутствуют обязательные поля' });
+    }
+
+    const user = await findUserById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'Пользователь не найден' });
+    }
+
+    const quizResult = new QuizResult({
+      id: generateEntryId(),
+      userId,
+      setId,
+      setTitle: setTitle || 'Безымянный набор',
+      score: Math.round(score),
+      totalQuestions,
+      correctAnswers: correctAnswers || 0,
+      durationSeconds: durationSeconds || 0,
+      answers: answers || [],
+    });
+
+    await quizResult.save();
+
+    // Update stats
+    await updateStats(userId, { quizzesTaken: 1 });
+
+    console.log(`[QUIZ] Result saved for user ${userId}, set ${setId}, score ${score}%`);
+    res.status(201).json({ success: true, data: quizResult });
+  } catch (error) {
+    console.error('[QUIZ][ERROR]', error);
+    res.status(500).json({ message: 'Не удалось сохранить результат квиза' });
+  }
+});
+
+// Get latest quiz result
+app.get('/quiz-results/latest/:userId', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId, 10);
+    if (!Number.isFinite(userId)) {
+      return res.status(400).json({ message: 'Некорректный ID пользователя' });
+    }
+
+    const result = await QuizResult.findOne({ userId }).sort({ createdAt: -1 }).lean();
+    if (!result) {
+      return res.status(404).json({ message: 'Результаты не найдены' });
+    }
+
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    console.error('[QUIZ][ERROR]', error);
+    res.status(500).json({ message: 'Не удалось получить результат' });
+  }
+});
+
+// Get quiz history
+app.get('/quiz-results/history/:userId', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId, 10);
+    const limit = parseInt(req.query.limit, 10) || 20;
+    const skip = parseInt(req.query.skip, 10) || 0;
+
+    if (!Number.isFinite(userId)) {
+      return res.status(400).json({ message: 'Некорректный ID пользователя' });
+    }
+
+    const results = await QuizResult.find({ userId })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .skip(skip)
+      .lean();
+
+    const total = await QuizResult.countDocuments({ userId });
+
+    res.status(200).json({ 
+      success: true, 
+      data: results,
+      pagination: { total, limit, skip, hasMore: skip + results.length < total }
+    });
+  } catch (error) {
+    console.error('[QUIZ][ERROR]', error);
+    res.status(500).json({ message: 'Не удалось получить историю квизов' });
+  }
+});
+
+// ========== STATS API ==========
+
+// Helper function to update stats
+async function updateStats(userId, updates) {
+  const today = startOfDay();
+  
+  const updateFields = {};
+  if (updates.studyMinutes) updateFields.studyMinutes = updates.studyMinutes;
+  if (updates.scansCount) updateFields.$inc = { ...updateFields.$inc, scansCount: updates.scansCount };
+  if (updates.recordingsCount) updateFields.$inc = { ...updateFields.$inc, recordingsCount: updates.recordingsCount };
+  if (updates.chatSessionsCount) updateFields.$inc = { ...updateFields.$inc, chatSessionsCount: updates.chatSessionsCount };
+  if (updates.cardsCreated) updateFields.$inc = { ...updateFields.$inc, cardsCreated: updates.cardsCreated };
+  if (updates.quizzesTaken) updateFields.$inc = { ...updateFields.$inc, quizzesTaken: updates.quizzesTaken };
+
+  if (Object.keys(updateFields).length === 0) return;
+
+  const incFields = updateFields.$inc || {};
+  delete updateFields.$inc;
+
+  await StudyStatsDaily.findOneAndUpdate(
+    { userId, date: today },
+    {
+      ...updateFields,
+      $inc: incFields,
+      $set: { updatedAt: new Date() }
+    },
+    { upsert: true, new: true }
+  );
+}
+
+// Report activity
+app.post('/stats/report', async (req, res) => {
+  try {
+    const { userId, type, minutes } = req.body;
+    
+    if (!userId || !type) {
+      return res.status(400).json({ message: 'Отсутствуют обязательные поля' });
+    }
+
+    const user = await findUserById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'Пользователь не найден' });
+    }
+
+    const updates = {};
+    if (type === 'scan') updates.scansCount = 1;
+    if (type === 'recording') updates.recordingsCount = 1;
+    if (type === 'chat') updates.chatSessionsCount = 1;
+    if (minutes) updates.studyMinutes = minutes;
+
+    await updateStats(userId, updates);
+
+    console.log(`[STATS] Activity reported for user ${userId}: ${type}`);
+    res.status(200).json({ success: true, message: 'Активность зафиксирована' });
+  } catch (error) {
+    console.error('[STATS][ERROR]', error);
+    res.status(500).json({ message: 'Не удалось зафиксировать активность' });
+  }
+});
+
+// Get today's stats
+app.get('/stats/today/:userId', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId, 10);
+    if (!Number.isFinite(userId)) {
+      return res.status(400).json({ message: 'Некорректный ID пользователя' });
+    }
+
+    const today = startOfDay();
+    let stats = await StudyStatsDaily.findOne({ userId, date: today }).lean();
+
+    if (!stats) {
+      stats = {
+        userId,
+        date: today,
+        studyMinutes: 0,
+        scansCount: 0,
+        recordingsCount: 0,
+        chatSessionsCount: 0,
+        cardsCreated: 0,
+        quizzesTaken: 0,
+      };
+    }
+
+    res.status(200).json({ success: true, data: stats });
+  } catch (error) {
+    console.error('[STATS][ERROR]', error);
+    res.status(500).json({ message: 'Не удалось получить статистику' });
+  }
+});
+
+// Get week stats
+app.get('/stats/week/:userId', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId, 10);
+    if (!Number.isFinite(userId)) {
+      return res.status(400).json({ message: 'Некорректный ID пользователя' });
+    }
+
+    const today = startOfDay();
+    const weekAgo = new Date(today);
+    weekAgo.setDate(weekAgo.getDate() - 6); // Last 7 days
+
+    const stats = await StudyStatsDaily.find({
+      userId,
+      date: { $gte: weekAgo, $lte: today }
+    }).sort({ date: 1 }).lean();
+
+    const summary = {
+      totalStudyMinutes: 0,
+      totalScans: 0,
+      totalRecordings: 0,
+      totalChatSessions: 0,
+      totalCardsCreated: 0,
+      totalQuizzes: 0,
+      dailyStats: stats,
+    };
+
+    stats.forEach(day => {
+      summary.totalStudyMinutes += day.studyMinutes || 0;
+      summary.totalScans += day.scansCount || 0;
+      summary.totalRecordings += day.recordingsCount || 0;
+      summary.totalChatSessions += day.chatSessionsCount || 0;
+      summary.totalCardsCreated += day.cardsCreated || 0;
+      summary.totalQuizzes += day.quizzesTaken || 0;
+    });
+
+    res.status(200).json({ success: true, data: summary });
+  } catch (error) {
+    console.error('[STATS][ERROR]', error);
+    res.status(500).json({ message: 'Не удалось получить недельную статистику' });
+  }
+});
+
+// ========== NOTEBOOK API ==========
+
+// Get notebook entries with filters
+app.get('/notebook/:userId', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId, 10);
+    const { type, tags, course, search, limit = 50, skip = 0 } = req.query;
+
+    if (!Number.isFinite(userId)) {
+      return res.status(400).json({ message: 'Некорректный ID пользователя' });
+    }
+
+    const query = { userId };
+    if (type) query.type = type;
+    if (course) query.course = course;
+    if (tags) query.tags = { $in: Array.isArray(tags) ? tags : [tags] };
+    if (search) {
+      query.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { summary: { $regex: search, $options: 'i' } },
+        { tags: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    const entries = await NotebookEntry.find(query)
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit))
+      .skip(parseInt(skip))
+      .lean();
+
+    const total = await NotebookEntry.countDocuments(query);
+
+    res.status(200).json({ 
+      success: true, 
+      data: entries,
+      pagination: { total, limit: parseInt(limit), skip: parseInt(skip) }
+    });
+  } catch (error) {
+    console.error('[NOTEBOOK][ERROR]', error);
+    res.status(500).json({ message: 'Не удалось получить записи' });
+  }
+});
+
+// Create notebook entry
+app.post('/notebook/:userId', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId, 10);
+    const { type, title, summary, tags, course, linkedResourceId, manualNotes } = req.body;
+
+    if (!Number.isFinite(userId) || !type || !title) {
+      return res.status(400).json({ message: 'Отсутствуют обязательные поля' });
+    }
+
+    const user = await findUserById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'Пользователь не найден' });
+    }
+
+    const entry = new NotebookEntry({
+      id: generateEntryId(),
+      userId,
+      type,
+      title,
+      summary: summary || '',
+      tags: tags || [],
+      course: course || '',
+      linkedResourceId,
+      manualNotes: manualNotes || '',
+    });
+
+    await entry.save();
+
+    console.log(`[NOTEBOOK] Entry created for user ${userId}: ${title}`);
+    res.status(201).json({ success: true, data: entry });
+  } catch (error) {
+    console.error('[NOTEBOOK][ERROR]', error);
+    res.status(500).json({ message: 'Не удалось создать запись' });
+  }
+});
+
+// Get single notebook entry
+app.get('/notebook/:userId/:entryId', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId, 10);
+    const { entryId } = req.params;
+
+    if (!Number.isFinite(userId)) {
+      return res.status(400).json({ message: 'Некорректный ID пользователя' });
+    }
+
+    const entry = await NotebookEntry.findOne({ id: entryId, userId }).lean();
+    if (!entry) {
+      return res.status(404).json({ message: 'Запись не найдена' });
+    }
+
+    // Load linked resource based on type
+    let linkedResource = null;
+    if (entry.linkedResourceId) {
+      if (entry.type === 'lecture') {
+        linkedResource = await AiLecture.findOne({ id: entry.linkedResourceId }).lean();
+      } else if (entry.type === 'scan') {
+        linkedResource = await AiScanNote.findOne({ id: entry.linkedResourceId }).lean();
+      } else if (entry.type === 'session') {
+        linkedResource = await AiSession.findOne({ id: entry.linkedResourceId }).lean();
+      }
+    }
+
+    res.status(200).json({ success: true, data: { ...entry, linkedResource } });
+  } catch (error) {
+    console.error('[NOTEBOOK][ERROR]', error);
+    res.status(500).json({ message: 'Не удалось получить запись' });
+  }
+});
+
+// Update notebook entry
+app.put('/notebook/:userId/:entryId', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId, 10);
+    const { entryId } = req.params;
+    const { title, summary, tags, course, manualNotes } = req.body;
+
+    if (!Number.isFinite(userId)) {
+      return res.status(400).json({ message: 'Некорректный ID пользователя' });
+    }
+
+    const updateFields = { updatedAt: new Date() };
+    if (title) updateFields.title = title;
+    if (summary !== undefined) updateFields.summary = summary;
+    if (tags) updateFields.tags = tags;
+    if (course !== undefined) updateFields.course = course;
+    if (manualNotes !== undefined) updateFields.manualNotes = manualNotes;
+
+    const entry = await NotebookEntry.findOneAndUpdate(
+      { id: entryId, userId },
+      { $set: updateFields },
+      { new: true }
+    ).lean();
+
+    if (!entry) {
+      return res.status(404).json({ message: 'Запись не найдена' });
+    }
+
+    console.log(`[NOTEBOOK] Entry updated: ${entryId}`);
+    res.status(200).json({ success: true, data: entry });
+  } catch (error) {
+    console.error('[NOTEBOOK][ERROR]', error);
+    res.status(500).json({ message: 'Не удалось обновить запись' });
+  }
+});
+
+// Delete notebook entry
+app.delete('/notebook/:userId/:entryId', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId, 10);
+    const { entryId } = req.params;
+
+    if (!Number.isFinite(userId)) {
+      return res.status(400).json({ message: 'Некорректный ID пользователя' });
+    }
+
+    const entry = await NotebookEntry.findOneAndDelete({ id: entryId, userId });
+    if (!entry) {
+      return res.status(404).json({ message: 'Запись не найдена' });
+    }
+
+    console.log(`[NOTEBOOK] Entry deleted: ${entryId}`);
+    res.status(200).json({ success: true, message: 'Запись удалена' });
+  } catch (error) {
+    console.error('[NOTEBOOK][ERROR]', error);
+    res.status(500).json({ message: 'Не удалось удалить запись' });
+  }
+});
+
+// ========== PLANNER API ==========
+
+// Helper function to get Monday of current week
+function getMonday(date = new Date()) {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
+  return startOfDay(new Date(d.setDate(diff)));
+}
+
+// Get planner for the week
+app.get('/planner/week/:userId', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId, 10);
+    if (!Number.isFinite(userId)) {
+      return res.status(400).json({ message: 'Некорректный ID пользователя' });
+    }
+
+    const weekStart = getMonday();
+    let planner = await PlannerSchedule.findOne({ userId }).lean();
+
+    if (!planner) {
+      // Create empty planner
+      planner = {
+        userId,
+        weekStart,
+        tasks: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+    }
+
+    res.status(200).json({ success: true, data: planner });
+  } catch (error) {
+    console.error('[PLANNER][ERROR]', error);
+    res.status(500).json({ message: 'Не удалось получить план' });
+  }
+});
+
+// Update/Create planner for the week
+app.put('/planner/week/:userId', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId, 10);
+    const { tasks } = req.body;
+
+    if (!Number.isFinite(userId)) {
+      return res.status(400).json({ message: 'Некорректный ID пользователя' });
+    }
+
+    const user = await findUserById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'Пользователь не найден' });
+    }
+
+    const weekStart = getMonday();
+
+    const planner = await PlannerSchedule.findOneAndUpdate(
+      { userId },
+      {
+        $set: {
+          weekStart,
+          tasks: tasks || [],
+          updatedAt: new Date(),
+        },
+        $setOnInsert: {
+          createdAt: new Date(),
+        }
+      },
+      { upsert: true, new: true }
+    ).lean();
+
+    console.log(`[PLANNER] Updated for user ${userId}, ${tasks?.length || 0} tasks`);
+    res.status(200).json({ success: true, data: planner });
+  } catch (error) {
+    console.error('[PLANNER][ERROR]', error);
+    res.status(500).json({ message: 'Не удалось обновить план' });
+  }
+});
+
+// Toggle task completion
+app.post('/planner/task/:taskId/toggle', async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ message: 'Отсутствует ID пользователя' });
+    }
+
+    const planner = await PlannerSchedule.findOne({ userId });
+    if (!planner) {
+      return res.status(404).json({ message: 'План не найден' });
+    }
+
+    const task = planner.tasks.find(t => t.id === taskId);
+    if (!task) {
+      return res.status(404).json({ message: 'Задача не найдена' });
+    }
+
+    task.completed = !task.completed;
+    planner.updatedAt = new Date();
+    await planner.save();
+
+    console.log(`[PLANNER] Task ${taskId} toggled: ${task.completed}`);
+    res.status(200).json({ success: true, data: planner });
+  } catch (error) {
+    console.error('[PLANNER][ERROR]', error);
+    res.status(500).json({ message: 'Не удалось обновить задачу' });
+  }
+});
+
+// Generate AI planner (simple version - can be enhanced with Gemini later)
+app.post('/planner/generate/:userId', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId, 10);
+    if (!Number.isFinite(userId)) {
+      return res.status(400).json({ message: 'Некорректный ID пользователя' });
+    }
+
+    const user = await findUserById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'Пользователь не найден' });
+    }
+
+    // Get recent notebook entries
+    const recentEntries = await NotebookEntry.find({ userId })
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .lean();
+
+    // Get recent quiz results to find weak areas
+    const recentQuizzes = await QuizResult.find({ userId })
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .lean();
+
+    const weekStart = getMonday();
+    const tasks = [];
+
+    // Create review tasks for recent lectures (spaced repetition: 1, 3, 7 days)
+    recentEntries.filter(e => e.type === 'lecture').slice(0, 3).forEach((lecture, idx) => {
+      const reviewDate = new Date(weekStart);
+      reviewDate.setDate(reviewDate.getDate() + idx + 1);
+
+      tasks.push({
+        id: generateEntryId(),
+        date: reviewDate,
+        title: `Повторить: ${lecture.title}`,
+        type: 'review_lecture',
+        relatedNotebookId: lecture.id,
+        completed: false,
+        priority: 'medium',
+      });
+    });
+
+    // Create review tasks for scans
+    recentEntries.filter(e => e.type === 'scan').slice(0, 2).forEach((scan, idx) => {
+      const reviewDate = new Date(weekStart);
+      reviewDate.setDate(reviewDate.getDate() + idx + 3);
+
+      tasks.push({
+        id: generateEntryId(),
+        date: reviewDate,
+        title: `Просмотреть: ${scan.title}`,
+        type: 'review_scan',
+        relatedNotebookId: scan.id,
+        completed: false,
+        priority: 'low',
+      });
+    });
+
+    // Add quiz tasks for sets with poor performance
+    recentQuizzes.filter(q => q.score < 70).slice(0, 2).forEach((quiz, idx) => {
+      const quizDate = new Date(weekStart);
+      quizDate.setDate(quizDate.getDate() + idx + 2);
+
+      tasks.push({
+        id: generateEntryId(),
+        date: quizDate,
+        title: `Повторить квиз: ${quiz.setTitle}`,
+        type: 'quiz',
+        completed: false,
+        priority: 'high',
+      });
+    });
+
+    // Save planner
+    const planner = await PlannerSchedule.findOneAndUpdate(
+      { userId },
+      {
+        $set: {
+          weekStart,
+          tasks,
+          updatedAt: new Date(),
+        },
+        $setOnInsert: {
+          createdAt: new Date(),
+        }
+      },
+      { upsert: true, new: true }
+    ).lean();
+
+    console.log(`[PLANNER] AI-generated plan for user ${userId}: ${tasks.length} tasks`);
+    res.status(200).json({ success: true, data: planner });
+  } catch (error) {
+    console.error('[PLANNER][ERROR]', error);
+    res.status(500).json({ message: 'Не удалось создать план' });
+  }
+});
+
+// ========== AI EXTENDED RESOURCES API ==========
+
+// Create AI Lecture from voice recording
+app.post('/ai/lectures/create', async (req, res) => {
+  try {
+    const { userId, recordingId, title, durationSeconds, transcription, summary, keyPoints, keyConcepts, questions, tags, course } = req.body;
+
+    if (!userId || !title) {
+      return res.status(400).json({ message: 'userId и title обязательны' });
+    }
+
+    const user = await findUserById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'Пользователь не найден' });
+    }
+
+    const lectureId = generateEntryId();
+    
+    const lecture = new AiLecture({
+      id: lectureId,
+      userId,
+      recordingId,
+      title,
+      durationSeconds: durationSeconds || 0,
+      transcription: transcription || '',
+      summary: summary || '',
+      keyConcepts: keyConcepts || [],
+      questions: questions || [],
+      tags: tags || [],
+      course: course || '',
+    });
+
+    await lecture.save();
+
+    // Create notebook entry
+    const notebookEntry = new NotebookEntry({
+      id: generateEntryId(),
+      userId,
+      type: 'lecture',
+      title,
+      summary: summary || '',
+      tags: tags || [],
+      course: course || '',
+      linkedResourceId: lectureId,
+    });
+
+    await notebookEntry.save();
+
+    // Link back
+    lecture.notebookEntryId = notebookEntry.id;
+    await lecture.save();
+
+    console.log(`[AI][LECTURE] Created for user ${userId}: ${title}`);
+    res.status(201).json({ success: true, data: { lecture, notebookEntry } });
+  } catch (error) {
+    console.error('[AI][LECTURE][ERROR]', error);
+    res.status(500).json({ message: 'Не удалось создать лекцию' });
+  }
+});
+
+// Create AI Scan Note
+app.post('/ai/scans/create', async (req, res) => {
+  try {
+    const { userId, title, imageUrl, summary, keyPoints, concepts, formulas, questions, subject, tags, course, manualNotes } = req.body;
+
+    if (!userId || !title) {
+      return res.status(400).json({ message: 'userId и title обязательны' });
+    }
+
+    const user = await findUserById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'Пользователь не найден' });
+    }
+
+    const scanNoteId = generateEntryId();
+    
+    const scanNote = new AiScanNote({
+      id: scanNoteId,
+      userId,
+      title,
+      imageUrl: imageUrl || '',
+      summary: summary || '',
+      keyPoints: keyPoints || [],
+      concepts: concepts || [],
+      formulas: formulas || [],
+      questions: questions || [],
+      subject: subject || '',
+      tags: tags || [],
+      course: course || '',
+      manualNotes: manualNotes || '',
+    });
+
+    await scanNote.save();
+
+    // Create notebook entry
+    const notebookEntry = new NotebookEntry({
+      id: generateEntryId(),
+      userId,
+      type: 'scan',
+      title,
+      summary: summary || '',
+      tags: tags || [],
+      course: course || '',
+      linkedResourceId: scanNoteId,
+    });
+
+    await notebookEntry.save();
+
+    // Link back
+    scanNote.notebookEntryId = notebookEntry.id;
+    await scanNote.save();
+
+    console.log(`[AI][SCAN] Created for user ${userId}: ${title}`);
+    res.status(201).json({ success: true, data: { scanNote, notebookEntry } });
+  } catch (error) {
+    console.error('[AI][SCAN][ERROR]', error);
+    res.status(500).json({ message: 'Не удалось создать конспект' });
+  }
+});
+
+// Create AI Session
+app.post('/ai/sessions/create', async (req, res) => {
+  try {
+    const { userId, title, goals, keyTakeaways, homework, suggestedNextSteps, messagesCount, durationMinutes } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ message: 'userId обязателен' });
+    }
+
+    const user = await findUserById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'Пользователь не найден' });
+    }
+
+    const sessionId = generateEntryId();
+    
+    const session = new AiSession({
+      id: sessionId,
+      userId,
+      title: title || 'Сессия с AI',
+      goals: goals || [],
+      keyTakeaways: keyTakeaways || [],
+      homework: homework || [],
+      suggestedNextSteps: suggestedNextSteps || [],
+      messagesCount: messagesCount || 0,
+      durationMinutes: durationMinutes || 0,
+    });
+
+    await session.save();
+
+    // Create notebook entry
+    const notebookEntry = new NotebookEntry({
+      id: generateEntryId(),
+      userId,
+      type: 'session',
+      title: title || 'Сессия с AI',
+      summary: keyTakeaways.join('. ') || '',
+      linkedResourceId: sessionId,
+    });
+
+    await notebookEntry.save();
+
+    // Link back
+    session.notebookEntryId = notebookEntry.id;
+    await session.save();
+
+    console.log(`[AI][SESSION] Created for user ${userId}`);
+    res.status(201).json({ success: true, data: { session, notebookEntry } });
+  } catch (error) {
+    console.error('[AI][SESSION][ERROR]', error);
+    res.status(500).json({ message: 'Не удалось создать сессию' });
+  }
+});
+
+// Generate flashcards from AI Lecture
+app.post('/ai/lectures/:lectureId/cards', async (req, res) => {
+  try {
+    const { lectureId } = req.params;
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ message: 'userId обязателен' });
+    }
+
+    const lecture = await AiLecture.findOne({ id: lectureId, userId }).lean();
+    if (!lecture) {
+      return res.status(404).json({ message: 'Лекция не найдена' });
+    }
+
+    // Generate cards from key concepts and questions
+    const cards = [];
+    
+    // Create cards from key concepts
+    lecture.keyConcepts?.forEach(concept => {
+      const relatedPoint = lecture.keyPoints?.find(p => p.toLowerCase().includes(concept.toLowerCase()));
+      if (relatedPoint) {
+        cards.push({
+          term: concept,
+          definition: relatedPoint,
+        });
+      }
+    });
+
+    // Create cards from questions
+    lecture.questions?.forEach((question, idx) => {
+      const answer = lecture.keyPoints?.[idx] || lecture.summary || 'Смотрите в конспекте';
+      cards.push({
+        term: question,
+        definition: answer,
+      });
+    });
+
+    console.log(`[AI][CARDS] Generated ${cards.length} cards from lecture ${lectureId}`);
+    res.status(200).json({ success: true, data: { cards } });
+  } catch (error) {
+    console.error('[AI][CARDS][ERROR]', error);
+    res.status(500).json({ message: 'Не удалось создать карточки' });
+  }
+});
+
+// Generate flashcards from AI Scan Note
+app.post('/ai/scans/:scanId/cards', async (req, res) => {
+  try {
+    const { scanId } = req.params;
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ message: 'userId обязателен' });
+    }
+
+    const scan = await AiScanNote.findOne({ id: scanId, userId }).lean();
+    if (!scan) {
+      return res.status(404).json({ message: 'Конспект не найден' });
+    }
+
+    // Generate cards
+    const cards = [];
+    
+    // Create cards from concepts
+    scan.concepts?.forEach(concept => {
+      const relatedPoint = scan.keyPoints?.find(p => p.toLowerCase().includes(concept.toLowerCase()));
+      if (relatedPoint) {
+        cards.push({
+          term: concept,
+          definition: relatedPoint,
+        });
+      }
+    });
+
+    // Create cards from formulas
+    scan.formulas?.forEach(formula => {
+      cards.push({
+        term: `Формула: ${formula}`,
+        definition: scan.summary || 'Смотрите в конспекте',
+      });
+    });
+
+    // Create cards from questions
+    scan.questions?.forEach((question, idx) => {
+      const answer = scan.keyPoints?.[idx] || scan.summary || 'Смотрите в конспекте';
+      cards.push({
+        term: question,
+        definition: answer,
+      });
+    });
+
+    console.log(`[AI][CARDS] Generated ${cards.length} cards from scan ${scanId}`);
+    res.status(200).json({ success: true, data: { cards } });
+  } catch (error) {
+    console.error('[AI][CARDS][ERROR]', error);
+    res.status(500).json({ message: 'Не удалось создать карточки' });
+  }
+});
+
+// ========== INSIGHTS API ==========
+
+// Get insights for a specific week
+app.get('/insights/week/:userId', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId, 10);
+    const { weekStart } = req.query;
+
+    if (!Number.isFinite(userId)) {
+      return res.status(400).json({ message: 'Некорректный ID пользователя' });
+    }
+
+    const targetWeekStart = weekStart ? new Date(weekStart) : getMonday();
+    const insight = await AiInsight.findOne({ 
+      userId, 
+      weekStart: targetWeekStart 
+    }).lean();
+
+    if (!insight) {
+      return res.status(404).json({ message: 'Инсайты для этой недели не найдены' });
+    }
+
+    res.status(200).json({ success: true, data: insight });
+  } catch (error) {
+    console.error('[INSIGHTS][ERROR]', error);
+    res.status(500).json({ message: 'Не удалось получить инсайты' });
+  }
+});
+
+// Get latest insights
+app.get('/insights/latest/:userId', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId, 10);
+    if (!Number.isFinite(userId)) {
+      return res.status(400).json({ message: 'Некорректный ID пользователя' });
+    }
+
+    const insight = await AiInsight.findOne({ userId })
+      .sort({ weekStart: -1 })
+      .lean();
+
+    if (!insight) {
+      // Generate insights if none exist
+      return res.status(404).json({ message: 'Инсайты еще не созданы' });
+    }
+
+    res.status(200).json({ success: true, data: insight });
+  } catch (error) {
+    console.error('[INSIGHTS][ERROR]', error);
+    res.status(500).json({ message: 'Не удалось получить инсайты' });
+  }
+});
+
+// Generate weekly insights
+app.post('/insights/generate/:userId', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId, 10);
+    if (!Number.isFinite(userId)) {
+      return res.status(400).json({ message: 'Некорректный ID пользователя' });
+    }
+
+    const user = await findUserById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'Пользователь не найден' });
+    }
+
+    const weekStart = getMonday();
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+
+    // Get week stats
+    const stats = await StudyStatsDaily.find({
+      userId,
+      date: { $gte: weekStart, $lte: weekEnd }
+    }).lean();
+
+    // Get notebook entries from this week
+    const entries = await NotebookEntry.find({
+      userId,
+      createdAt: { $gte: weekStart, $lte: weekEnd }
+    }).lean();
+
+    // Get quiz results
+    const quizzes = await QuizResult.find({
+      userId,
+      createdAt: { $gte: weekStart, $lte: weekEnd }
+    }).lean();
+
+    // Calculate insights
+    const totalStudyMinutes = stats.reduce((sum, day) => sum + (day.studyMinutes || 0), 0);
+    const scansCompleted = stats.reduce((sum, day) => sum + (day.scansCount || 0), 0);
+    const lecturesCompleted = stats.reduce((sum, day) => sum + (day.recordingsCount || 0), 0);
+    const quizzesTaken = quizzes.length;
+    const averageScore = quizzes.length > 0
+      ? quizzes.reduce((sum, q) => sum + q.score, 0) / quizzes.length
+      : 0;
+
+    // Extract learned topics from tags
+    const allTags = entries.flatMap(e => e.tags || []);
+    const tagCounts = allTags.reduce((acc, tag) => {
+      acc[tag] = (acc[tag] || 0) + 1;
+      return acc;
+    }, {});
+    const learnedTopics = Object.entries(tagCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([tag]) => tag);
+
+    // Find weak areas from quizzes
+    const weakQuizzes = quizzes.filter(q => q.score < 70);
+    const weakAreas = weakQuizzes.map(q => q.setTitle).slice(0, 3);
+
+    // Simple suggestions
+    const suggestedReviews = [];
+    if (averageScore < 70) {
+      suggestedReviews.push('Уделите больше времени повторению материала перед квизами');
+    }
+    if (totalStudyMinutes < 180) {
+      suggestedReviews.push('Попробуйте заниматься хотя бы 30 минут каждый день');
+    }
+    if (weakAreas.length > 0) {
+      suggestedReviews.push(`Повторите темы: ${weakAreas.join(', ')}`);
+    }
+    if (lecturesCompleted > 0 && scansCompleted === 0) {
+      suggestedReviews.push('Дополните лекции конспектами для лучшего запоминания');
+    }
+
+    const summary = `За эту неделю вы занимались ${totalStudyMinutes} минут, ` +
+      `создали ${scansCompleted} конспектов и ${lecturesCompleted} лекций. ` +
+      `Средний результат квизов: ${Math.round(averageScore)}%.`;
+
+    const insight = await AiInsight.findOneAndUpdate(
+      { userId, weekStart },
+      {
+        $set: {
+          weekEnd,
+          learnedTopics,
+          weakAreas,
+          suggestedReviews,
+          summary,
+          stats: {
+            totalStudyMinutes,
+            scansCompleted,
+            lecturesCompleted,
+            quizzesTaken,
+            averageScore: Math.round(averageScore),
+          },
+        },
+        $setOnInsert: {
+          id: generateEntryId(),
+          userId,
+          weekStart,
+        }
+      },
+      { upsert: true, new: true }
+    ).lean();
+
+    console.log(`[INSIGHTS] Generated for user ${userId}, week ${weekStart.toISOString()}`);
+    res.status(200).json({ success: true, data: insight });
+  } catch (error) {
+    console.error('[INSIGHTS][ERROR]', error);
+    res.status(500).json({ message: 'Не удалось сгенерировать инсайты' });
+  }
 });
 
 // Add server uptime tracking
