@@ -4201,9 +4201,17 @@ app.post('/ai/generate-cards-from-metadata', async (req, res) => {
       return res.status(400).json({ message: 'userId и title обязательны' });
     }
 
-    const user = await User.findOne({ id: userId });
-    if (!user || !user.geminiApiKey) {
-      return res.status(400).json({ message: 'Gemini API key не настроен' });
+    // Load user and check usage limits
+    const user = await loadAiUser(userId);
+    const usageCheck = checkUsageLimit(user, 'chat'); // Using 'chat' as it's a general AI request
+    if (!usageCheck.allowed) {
+      return res.status(429).json(buildLimitError(FEATURE_LABELS.chat, buildAiMeta(user, 'chat')));
+    }
+
+    // Load Gemini API key
+    const apiKey = await loadGeminiKey();
+    if (!apiKey) {
+      return res.status(503).json({ message: 'Gemini API ключ не настроен' });
     }
 
     // Build context from metadata
@@ -4226,7 +4234,7 @@ ${context}
 
     console.log('[AI][METADATA_CARDS] Generating cards for:', title);
 
-    const aiResponse = await callGemini(user.geminiApiKey, {
+    const aiResponse = await callGemini(apiKey, {
       contents: [{ parts: [{ text: prompt }] }],
     });
 
@@ -4245,7 +4253,15 @@ ${context}
     }));
 
     console.log(`[AI][METADATA_CARDS] Generated ${cards.length} cards for "${title}"`);
-    res.status(200).json({ success: true, data: { cards } });
+
+    // Update AI usage stats
+    const updatedUser = await updateAiUsage(userId, 'chat');
+    
+    res.status(200).json({ 
+      success: true, 
+      data: { cards },
+      ai: buildAiMeta(updatedUser, 'chat')
+    });
   } catch (error) {
     console.error('[AI][METADATA_CARDS][ERROR]', error);
     res.status(500).json({ message: 'Не удалось сгенерировать карточки' });
