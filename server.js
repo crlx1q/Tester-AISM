@@ -3855,11 +3855,6 @@ app.post('/planner/generate/:userId', async (req, res) => {
     ).lean();
 
     console.log(`[PLANNER] AI-generated plan for user ${userId}: ${tasks.length} tasks`);
-    console.log(`[PLANNER] WeekStart: ${weekStart}`);
-    console.log(`[PLANNER] Sample task:`, tasks.length > 0 ? JSON.stringify(tasks[0]) : 'no tasks');
-    console.log(`[PLANNER] Planner object keys:`, Object.keys(planner));
-    console.log(`[PLANNER] Returning data:`, JSON.stringify(planner).substring(0, 500));
-    
     res.status(200).json({ success: true, data: planner });
   } catch (error) {
     console.error('[PLANNER][ERROR]', error);
