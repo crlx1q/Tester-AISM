@@ -3579,6 +3579,9 @@ app.get('/notebook/:userId/:entryId', async (req, res) => {
       } else if (entry.type === 'scan') {
         linkedResource = await AiScanNote.findOne({ id: entry.linkedResourceId }).lean();
         console.log(`[NOTEBOOK][GET] Scan found: ${linkedResource ? 'YES' : 'NO'}`);
+        if (linkedResource) {
+          console.log(`[NOTEBOOK][GET] Scan data: title=${linkedResource.title}, keyPoints=${linkedResource.keyPoints?.length}`);
+        }
       } else if (entry.type === 'session') {
         linkedResource = await AiSession.findOne({ id: entry.linkedResourceId }).lean();
         console.log(`[NOTEBOOK][GET] Session found: ${linkedResource ? 'YES' : 'NO'}`);
@@ -3591,7 +3594,10 @@ app.get('/notebook/:userId/:entryId', async (req, res) => {
       console.log(`[NOTEBOOK][GET] No linkedResourceId in entry`);
     }
 
-    res.status(200).json({ success: true, data: { ...entry, linkedResource } });
+    // IMPORTANT: Don't nest inside another 'data' object!
+    const response = { ...entry, linkedResource };
+    console.log(`[NOTEBOOK][GET] Response keys: ${Object.keys(response).join(', ')}`);
+    res.status(200).json({ success: true, data: response });
   } catch (error) {
     console.error('[NOTEBOOK][ERROR]', error);
     res.status(500).json({ message: 'Не удалось получить запись' });
