@@ -4260,11 +4260,18 @@ ${context}
     
     await user.save();
     
-    res.status(200).json({ 
-      success: true, 
-      data: { cards },
+    const responseData = { 
+      cards: cards,
       ai: buildAiMeta(user, 'chat')
+    };
+    
+    console.log('[AI][METADATA_CARDS] Response data:', {
+      cardsCount: responseData.cards.length,
+      firstCard: responseData.cards[0],
+      ai: responseData.ai ? 'present' : 'missing'
     });
+    
+    res.status(200).json(responseData);
   } catch (error) {
     console.error('[AI][METADATA_CARDS][ERROR]', error);
     res.status(500).json({ message: 'Не удалось сгенерировать карточки' });
