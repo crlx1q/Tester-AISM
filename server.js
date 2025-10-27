@@ -4020,7 +4020,7 @@ app.post('/ai/lectures/:lectureId/cards', async (req, res) => {
     }
 
     // Generate cards from key concepts and questions
-    const cards = [];
+    let cards = [];
     
     // Create cards from key concepts
     lecture.keyConcepts?.forEach(concept => {
@@ -4041,6 +4041,50 @@ app.post('/ai/lectures/:lectureId/cards', async (req, res) => {
         definition: answer,
       });
     });
+
+    // If no cards generated, use AI to generate from transcript/summary
+    if (cards.length === 0 && (lecture.transcription || lecture.summary)) {
+      console.log('[AI][CARDS] No existing data, generating with AI...');
+      
+      const user = await User.findOne({ id: userId });
+      if (!user || !user.geminiApiKey) {
+        return res.status(400).json({ message: 'Gemini API key не настроен' });
+      }
+
+      const content = lecture.transcription || lecture.summary;
+      const prompt = `На основе этого текста лекции создай 5-7 учебных карточек (flashcards).
+      
+Текст: ${content.substring(0, 3000)}
+
+Верни ТОЛЬКО JSON массив в формате:
+[{"term": "Вопрос или термин", "definition": "Ответ или определение"}, ...]`;
+
+      try {
+        const aiResponse = await callGemini(user.geminiApiKey, {
+          contents: [{ parts: [{ text: prompt }] }],
+        });
+
+        const text = aiResponse?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        const jsonMatch = text.match(/\[[\s\S]*\]/);
+        
+        if (jsonMatch) {
+          const aiCards = JSON.parse(jsonMatch[0]);
+          cards = aiCards.map(c => ({
+            term: c.term || c.question || '',
+            definition: c.definition || c.answer || '',
+          }));
+        }
+      } catch (aiError) {
+        console.error('[AI][CARDS][AI_ERROR]', aiError);
+        // Fallback: create basic cards from summary
+        if (lecture.summary) {
+          cards = [{
+            term: lecture.title || 'Лекция',
+            definition: lecture.summary,
+          }];
+        }
+      }
+    }
 
     console.log(`[AI][CARDS] Generated ${cards.length} cards from lecture ${lectureId}`);
     res.status(200).json({ success: true, data: { cards } });
@@ -4066,7 +4110,7 @@ app.post('/ai/scans/:scanId/cards', async (req, res) => {
     }
 
     // Generate cards
-    const cards = [];
+    let cards = [];
     
     // Create cards from concepts
     scan.concepts?.forEach(concept => {
@@ -4095,6 +4139,50 @@ app.post('/ai/scans/:scanId/cards', async (req, res) => {
         definition: answer,
       });
     });
+
+    // If no cards generated, use AI to generate from summary/content
+    if (cards.length === 0 && (scan.summary || scan.extractedText)) {
+      console.log('[AI][CARDS] No existing data, generating with AI...');
+      
+      const user = await User.findOne({ id: userId });
+      if (!user || !user.geminiApiKey) {
+        return res.status(400).json({ message: 'Gemini API key не настроен' });
+      }
+
+      const content = scan.extractedText || scan.summary;
+      const prompt = `На основе этого конспекта создай 5-7 учебных карточек (flashcards).
+      
+Текст: ${content.substring(0, 3000)}
+
+Верни ТОЛЬКО JSON массив в формате:
+[{"term": "Вопрос или термин", "definition": "Ответ или определение"}, ...]`;
+
+      try {
+        const aiResponse = await callGemini(user.geminiApiKey, {
+          contents: [{ parts: [{ text: prompt }] }],
+        });
+
+        const text = aiResponse?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        const jsonMatch = text.match(/\[[\s\S]*\]/);
+        
+        if (jsonMatch) {
+          const aiCards = JSON.parse(jsonMatch[0]);
+          cards = aiCards.map(c => ({
+            term: c.term || c.question || '',
+            definition: c.definition || c.answer || '',
+          }));
+        }
+      } catch (aiError) {
+        console.error('[AI][CARDS][AI_ERROR]', aiError);
+        // Fallback: create basic cards from summary
+        if (scan.summary) {
+          cards = [{
+            term: scan.title || 'Конспект',
+            definition: scan.summary,
+          }];
+        }
+      }
+    }
 
     console.log(`[AI][CARDS] Generated ${cards.length} cards from scan ${scanId}`);
     res.status(200).json({ success: true, data: { cards } });
