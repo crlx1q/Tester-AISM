@@ -840,23 +840,6 @@ const aiSessionSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now },
 }, { versionKey: false });
 
-// Schema for Todo Items
-const todoItemSchema = new mongoose.Schema({
-  id: { type: String, unique: true, required: true },
-  userId: { type: Number, required: true, index: true },
-  title: { type: String, required: true },
-  description: { type: String, default: '' },
-  isCompleted: { type: Boolean, default: false },
-  priority: { type: String, default: 'medium', enum: ['low', 'medium', 'high'] },
-  dueDate: { type: Date },
-  linkedResourceId: { type: String }, // Optional link to lecture/scan/session
-  linkedResourceType: { type: String, enum: ['lecture', 'scan', 'session'] },
-  tags: { type: [String], default: [] },
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now },
-  completedAt: { type: Date },
-}, { versionKey: false });
-
 // Schema for Study Planner Schedule
 const plannerScheduleSchema = new mongoose.Schema({
   userId: { type: Number, required: true, unique: true, index: true },
@@ -912,7 +895,6 @@ const NotebookEntry = mongoose.model('NotebookEntry', notebookEntrySchema);
 const AiLecture = mongoose.model('AiLecture', aiLectureSchema);
 const AiScanNote = mongoose.model('AiScanNote', aiScanNoteSchema);
 const AiSession = mongoose.model('AiSession', aiSessionSchema);
-const TodoItem = mongoose.model('TodoItem', todoItemSchema);
 const PlannerSchedule = mongoose.model('PlannerSchedule', plannerScheduleSchema);
 const AiInsight = mongoose.model('AiInsight', aiInsightSchema);
 
@@ -3473,8 +3455,6 @@ app.get('/notebook/:userId', async (req, res) => {
     const userId = parseInt(req.params.userId, 10);
     const { type, tags, course, search, limit = 50, skip = 0 } = req.query;
 
-    console.log(`[NOTEBOOK][LIST] Request - userId: ${userId}, type: ${type}, tags: ${tags}, course: ${course}, search: ${search}`);
-
     if (!Number.isFinite(userId)) {
       return res.status(400).json({ message: 'Некорректный ID пользователя' });
     }
@@ -3491,8 +3471,6 @@ app.get('/notebook/:userId', async (req, res) => {
       ];
     }
 
-    console.log(`[NOTEBOOK][LIST] Query:`, JSON.stringify(query));
-
     const entries = await NotebookEntry.find(query)
       .sort({ createdAt: -1 })
       .limit(parseInt(limit))
@@ -3500,8 +3478,6 @@ app.get('/notebook/:userId', async (req, res) => {
       .lean();
 
     const total = await NotebookEntry.countDocuments(query);
-
-    console.log(`[NOTEBOOK][LIST] Found ${entries.length} entries (total: ${total})`);
 
     res.status(200).json({ 
       success: true, 
@@ -3566,38 +3542,19 @@ app.get('/notebook/:userId/:entryId', async (req, res) => {
       return res.status(404).json({ message: 'Запись не найдена' });
     }
 
-    console.log(`[NOTEBOOK][GET] Entry found: ${entry.id}, type: ${entry.type}, linkedResourceId: ${entry.linkedResourceId}`);
-
     // Load linked resource based on type
     let linkedResource = null;
     if (entry.linkedResourceId) {
-      console.log(`[NOTEBOOK][GET] Looking for ${entry.type} with ID: ${entry.linkedResourceId}`);
-      
       if (entry.type === 'lecture') {
         linkedResource = await AiLecture.findOne({ id: entry.linkedResourceId }).lean();
-        console.log(`[NOTEBOOK][GET] Lecture found: ${linkedResource ? 'YES' : 'NO'}`);
       } else if (entry.type === 'scan') {
         linkedResource = await AiScanNote.findOne({ id: entry.linkedResourceId }).lean();
-        console.log(`[NOTEBOOK][GET] Scan found: ${linkedResource ? 'YES' : 'NO'}`);
-        if (linkedResource) {
-          console.log(`[NOTEBOOK][GET] Scan data: title=${linkedResource.title}, keyPoints=${linkedResource.keyPoints?.length}`);
-        }
       } else if (entry.type === 'session') {
         linkedResource = await AiSession.findOne({ id: entry.linkedResourceId }).lean();
-        console.log(`[NOTEBOOK][GET] Session found: ${linkedResource ? 'YES' : 'NO'}`);
       }
-
-      if (!linkedResource) {
-        console.log(`[NOTEBOOK][GET] WARNING: linkedResource not found for ${entry.type} with ID ${entry.linkedResourceId}`);
-      }
-    } else {
-      console.log(`[NOTEBOOK][GET] No linkedResourceId in entry`);
     }
 
-    // IMPORTANT: Don't nest inside another 'data' object!
-    const response = { ...entry, linkedResource };
-    console.log(`[NOTEBOOK][GET] Response keys: ${Object.keys(response).join(', ')}`);
-    res.status(200).json({ success: true, data: response });
+    res.status(200).json({ success: true, data: { ...entry, linkedResource } });
   } catch (error) {
     console.error('[NOTEBOOK][ERROR]', error);
     res.status(500).json({ message: 'Не удалось получить запись' });
@@ -4053,46 +4010,37 @@ app.post('/ai/lectures/:lectureId/cards', async (req, res) => {
     const { lectureId } = req.params;
     const { userId } = req.body;
 
-    console.log(`[AI][CARDS] Request for lecture: ${lectureId}, user: ${userId}`);
-
     if (!userId) {
       return res.status(400).json({ message: 'userId обязателен' });
     }
 
     const lecture = await AiLecture.findOne({ id: lectureId, userId }).lean();
     if (!lecture) {
-      console.log(`[AI][CARDS] Lecture not found: ${lectureId}`);
       return res.status(404).json({ message: 'Лекция не найдена' });
     }
-
-    console.log(`[AI][CARDS] Lecture found: ${lecture.title}, keyConcepts: ${lecture.keyConcepts?.length}, questions: ${lecture.questions?.length}`);
 
     // Generate cards from key concepts and questions
     const cards = [];
     
     // Create cards from key concepts
-    lecture.keyConcepts?.forEach((concept, idx) => {
-      cards.push({
-        term: concept,
-        definition: lecture.summary || 'Основная концепция из лекции',
-      });
+    lecture.keyConcepts?.forEach(concept => {
+      const relatedPoint = lecture.keyPoints?.find(p => p.toLowerCase().includes(concept.toLowerCase()));
+      if (relatedPoint) {
+        cards.push({
+          term: concept,
+          definition: relatedPoint,
+        });
+      }
     });
 
-    // Create cards from questions (with summary as answer)
+    // Create cards from questions
     lecture.questions?.forEach((question, idx) => {
+      const answer = lecture.keyPoints?.[idx] || lecture.summary || 'Смотрите в конспекте';
       cards.push({
         term: question,
-        definition: lecture.summary || 'Смотрите в конспекте лекции',
+        definition: answer,
       });
     });
-
-    // If no cards generated, create at least one from summary
-    if (cards.length === 0 && lecture.summary) {
-      cards.push({
-        term: lecture.title,
-        definition: lecture.summary,
-      });
-    }
 
     console.log(`[AI][CARDS] Generated ${cards.length} cards from lecture ${lectureId}`);
     res.status(200).json({ success: true, data: { cards } });
@@ -4108,47 +4056,34 @@ app.post('/ai/scans/:scanId/cards', async (req, res) => {
     const { scanId } = req.params;
     const { userId } = req.body;
 
-    console.log(`[AI][CARDS] Request for scan: ${scanId}, user: ${userId}`);
-
     if (!userId) {
       return res.status(400).json({ message: 'userId обязателен' });
     }
 
     const scan = await AiScanNote.findOne({ id: scanId, userId }).lean();
     if (!scan) {
-      console.log(`[AI][CARDS] Scan not found: ${scanId}`);
       return res.status(404).json({ message: 'Конспект не найден' });
     }
-
-    console.log(`[AI][CARDS] Scan found: ${scan.title}, concepts: ${scan.concepts?.length}, keyPoints: ${scan.keyPoints?.length}, formulas: ${scan.formulas?.length}, questions: ${scan.questions?.length}`);
 
     // Generate cards
     const cards = [];
     
-    // Create cards from concepts with keyPoints
-    scan.concepts?.forEach((concept, idx) => {
-      const relatedPoint = scan.keyPoints?.[idx] || scan.summary || 'Основная концепция';
-      cards.push({
-        term: concept,
-        definition: relatedPoint,
-      });
-    });
-
-    // Create cards from keyPoints if concepts are missing
-    if (scan.keyPoints && scan.keyPoints.length > scan.concepts?.length) {
-      scan.keyPoints.slice(scan.concepts?.length || 0).forEach((point, idx) => {
+    // Create cards from concepts
+    scan.concepts?.forEach(concept => {
+      const relatedPoint = scan.keyPoints?.find(p => p.toLowerCase().includes(concept.toLowerCase()));
+      if (relatedPoint) {
         cards.push({
-          term: `Ключевой момент ${(scan.concepts?.length || 0) + idx + 1}`,
-          definition: point,
+          term: concept,
+          definition: relatedPoint,
         });
-      });
-    }
+      }
+    });
 
     // Create cards from formulas
     scan.formulas?.forEach(formula => {
       cards.push({
-        term: `Формула`,
-        definition: formula,
+        term: `Формула: ${formula}`,
+        definition: scan.summary || 'Смотрите в конспекте',
       });
     });
 
@@ -4160,14 +4095,6 @@ app.post('/ai/scans/:scanId/cards', async (req, res) => {
         definition: answer,
       });
     });
-
-    // If no cards generated, create at least one from summary
-    if (cards.length === 0 && scan.summary) {
-      cards.push({
-        term: scan.title || 'Конспект',
-        definition: scan.summary,
-      });
-    }
 
     console.log(`[AI][CARDS] Generated ${cards.length} cards from scan ${scanId}`);
     res.status(200).json({ success: true, data: { cards } });
@@ -4342,133 +4269,6 @@ app.post('/insights/generate/:userId', async (req, res) => {
   }
 });
 
-// ========== TODO API ==========
-
-// Get all todos for a user
-app.get('/todos/:userId', async (req, res) => {
-  try {
-    const userId = parseInt(req.params.userId, 10);
-    const { completed, priority } = req.query;
-
-    if (!Number.isFinite(userId)) {
-      return res.status(400).json({ message: 'Некорректный ID пользователя' });
-    }
-
-    const query = { userId };
-    if (completed !== undefined) query.isCompleted = completed === 'true';
-    if (priority) query.priority = priority;
-
-    const todos = await TodoItem.find(query)
-      .sort({ isCompleted: 1, dueDate: 1, createdAt: -1 })
-      .lean();
-
-    res.status(200).json({ success: true, data: todos });
-  } catch (error) {
-    console.error('[TODO][ERROR]', error);
-    res.status(500).json({ message: 'Не удалось получить задачи' });
-  }
-});
-
-// Create todo
-app.post('/todos/:userId', async (req, res) => {
-  try {
-    const userId = parseInt(req.params.userId, 10);
-    const { title, description, priority, dueDate, linkedResourceId, linkedResourceType, tags } = req.body;
-
-    if (!Number.isFinite(userId) || !title) {
-      return res.status(400).json({ message: 'Отсутствуют обязательные поля' });
-    }
-
-    const todo = new TodoItem({
-      id: generateEntryId(),
-      userId,
-      title,
-      description: description || '',
-      priority: priority || 'medium',
-      dueDate: dueDate ? new Date(dueDate) : undefined,
-      linkedResourceId,
-      linkedResourceType,
-      tags: tags || [],
-    });
-
-    await todo.save();
-
-    console.log(`[TODO] Created for user ${userId}: ${title}`);
-    res.status(201).json({ success: true, data: todo });
-  } catch (error) {
-    console.error('[TODO][ERROR]', error);
-    res.status(500).json({ message: 'Не удалось создать задачу' });
-  }
-});
-
-// Update todo
-app.put('/todos/:userId/:todoId', async (req, res) => {
-  try {
-    const userId = parseInt(req.params.userId, 10);
-    const { todoId } = req.params;
-    const { title, description, isCompleted, priority, dueDate, tags } = req.body;
-
-    if (!Number.isFinite(userId)) {
-      return res.status(400).json({ message: 'Некорректный ID пользователя' });
-    }
-
-    const updateFields = { updatedAt: new Date() };
-    if (title !== undefined) updateFields.title = title;
-    if (description !== undefined) updateFields.description = description;
-    if (priority !== undefined) updateFields.priority = priority;
-    if (dueDate !== undefined) updateFields.dueDate = dueDate ? new Date(dueDate) : null;
-    if (tags !== undefined) updateFields.tags = tags;
-    if (isCompleted !== undefined) {
-      updateFields.isCompleted = isCompleted;
-      if (isCompleted) {
-        updateFields.completedAt = new Date();
-      } else {
-        updateFields.completedAt = null;
-      }
-    }
-
-    const todo = await TodoItem.findOneAndUpdate(
-      { id: todoId, userId },
-      { $set: updateFields },
-      { new: true }
-    ).lean();
-
-    if (!todo) {
-      return res.status(404).json({ message: 'Задача не найдена' });
-    }
-
-    console.log(`[TODO] Updated: ${todoId}`);
-    res.status(200).json({ success: true, data: todo });
-  } catch (error) {
-    console.error('[TODO][ERROR]', error);
-    res.status(500).json({ message: 'Не удалось обновить задачу' });
-  }
-});
-
-// Delete todo
-app.delete('/todos/:userId/:todoId', async (req, res) => {
-  try {
-    const userId = parseInt(req.params.userId, 10);
-    const { todoId } = req.params;
-
-    if (!Number.isFinite(userId)) {
-      return res.status(400).json({ message: 'Некорректный ID пользователя' });
-    }
-
-    const result = await TodoItem.deleteOne({ id: todoId, userId });
-
-    if (result.deletedCount === 0) {
-      return res.status(404).json({ message: 'Задача не найдена' });
-    }
-
-    console.log(`[TODO] Deleted: ${todoId}`);
-    res.status(200).json({ success: true, message: 'Задача удалена' });
-  } catch (error) {
-    console.error('[TODO][ERROR]', error);
-    res.status(500).json({ message: 'Не удалось удалить задачу' });
-  }
-});
-
 // Add server uptime tracking
 const startTime = Date.now();
 app.get('/health', (req, res) => {
@@ -4551,4 +4351,3 @@ wss.on('connection', (ws) => {
 
 // Немедленная проверка версии при запуске
 syncServerVersion();
-
