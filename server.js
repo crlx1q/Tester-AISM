@@ -4254,18 +4254,9 @@ ${context}
 
     console.log(`[AI][METADATA_CARDS] Generated ${cards.length} cards for "${title}"`);
 
-    // Update AI usage stats
+    // Update AI usage stats (increment counter and streak only, no history entry)
     incrementUsage(user, 'chat');
     updateUserStreak(user);
-    appendHistoryEntry(user, 'chat', {
-      id: generateEntryId(),
-      type: 'cards_generation',
-      title: title,
-      course: course,
-      tags: tags || [],
-      cardsCount: cards.length,
-      createdAt: new Date(),
-    });
     
     await user.save();
     
