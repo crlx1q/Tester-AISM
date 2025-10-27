@@ -4192,6 +4192,66 @@ app.post('/ai/scans/:scanId/cards', async (req, res) => {
   }
 });
 
+// Generate flashcards from metadata (title, course, tags)
+app.post('/ai/generate-cards-from-metadata', async (req, res) => {
+  try {
+    const { userId, title, course, tags } = req.body;
+
+    if (!userId || !title) {
+      return res.status(400).json({ message: 'userId и title обязательны' });
+    }
+
+    const user = await User.findOne({ id: userId });
+    if (!user || !user.geminiApiKey) {
+      return res.status(400).json({ message: 'Gemini API key не настроен' });
+    }
+
+    // Build context from metadata
+    let context = `Название набора: ${title}`;
+    if (course) context += `\nКурс: ${course}`;
+    if (tags && tags.length > 0) context += `\nТеги: ${tags.join(', ')}`;
+
+    const prompt = `Создай 7-10 учебных карточек (flashcards) для изучения следующей темы:
+
+${context}
+
+Карточки должны быть полезными для изучения этой темы. Включи:
+- Ключевые термины и определения
+- Важные концепции
+- Вопросы для проверки понимания
+- Практические примеры
+
+Верни ТОЛЬКО JSON массив в формате:
+[{"term": "Вопрос или термин", "definition": "Ответ или определение"}, ...]`;
+
+    console.log('[AI][METADATA_CARDS] Generating cards for:', title);
+
+    const aiResponse = await callGemini(user.geminiApiKey, {
+      contents: [{ parts: [{ text: prompt }] }],
+    });
+
+    const text = aiResponse?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    
+    if (!jsonMatch) {
+      console.error('[AI][METADATA_CARDS] No JSON found in response');
+      return res.status(500).json({ message: 'AI не вернул корректный формат' });
+    }
+
+    const aiCards = JSON.parse(jsonMatch[0]);
+    const cards = aiCards.map(c => ({
+      term: c.term || c.question || '',
+      definition: c.definition || c.answer || '',
+    }));
+
+    console.log(`[AI][METADATA_CARDS] Generated ${cards.length} cards for "${title}"`);
+    res.status(200).json({ success: true, data: { cards } });
+  } catch (error) {
+    console.error('[AI][METADATA_CARDS][ERROR]', error);
+    res.status(500).json({ message: 'Не удалось сгенерировать карточки' });
+  }
+});
+
 // ========== INSIGHTS API ==========
 
 // Get insights for a specific week
