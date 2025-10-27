@@ -1269,9 +1269,10 @@ const callGemini = (apiKey, payload, model = GEMINI_MODEL) => new Promise((resol
     hostname: 'generativelanguage.googleapis.com',
     method: 'POST',
     path,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json; charset=utf-8' },
   };
   const req = https.request(options, (res2) => {
+    res2.setEncoding('utf8'); // Установка кодировки UTF-8
     let raw = '';
     res2.on('data', (chunk) => raw += chunk);
     res2.on('end', () => {
