@@ -3495,11 +3495,16 @@ app.get('/notebook/:userId', async (req, res) => {
 
     // Добавляем imageUrl для конспектов (scan)
     const enrichedEntries = await Promise.all(entries.map(async (entry) => {
-      if (entry.type === 'scan' && entry.linkedResourceId) {
-        const scan = await AiScanNote.findOne({ id: entry.linkedResourceId }).lean();
-        if (scan && scan.imageUrl) {
-          entry.imageUrl = scan.imageUrl;
+      try {
+        if (entry.type === 'scan' && entry.linkedResourceId) {
+          const scan = await AiScanNote.findOne({ id: entry.linkedResourceId }).lean();
+          if (scan && scan.imageUrl) {
+            entry.imageUrl = scan.imageUrl;
+          }
         }
+      } catch (err) {
+        console.error('[NOTEBOOK] Failed to load imageUrl for entry:', entry.id, err);
+        // Продолжаем без imageUrl
       }
       return entry;
     }));
