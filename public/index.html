@@ -130,16 +130,14 @@
         }
 
         .logo-circle {
-            width: 160px;
-            height: 160px;
-            background: #ffffff; /* яркий белый круг */
-            border-radius: 50%;
+            background: transparent; /* убираем круг */
+            border-radius: 0;
             display: flex;
             align-items: center;
             justify-content: center;
             margin: 0 auto 40px;
-            box-shadow: 0 22px 70px rgba(255, 255, 255, 0.1), 0 18px 50px rgba(74, 118, 248, 0.15);
-            animation: pulse 3s ease-in-out infinite;
+            box-shadow: none;
+            animation: none;
         }
 
         @keyframes pulse {
@@ -365,14 +363,9 @@
                 grid-template-columns: 1fr;
             }
 
-            .logo-circle {
-                width: 130px;
-                height: 130px;
-            }
-
-            .logo-circle svg {
-                width: 50px;
-                height: 50px;
+            .logo-circle img {
+                width: 140px !important;
+                height: 140px !important;
             }
 
             .logo-text {
@@ -407,7 +400,7 @@
     <section class="hero" id="home">
         <div class="container">
             <div class="hero-content fade-in-up">
-                <div class="logo-circle"><img src="/logo.png" alt="Logo" style="width:90px;height:90px;border-radius:18px"></div>
+                <div class="logo-circle"><img src="/logo.png" alt="Logo" style="width:200px;height:200px"></div>
                 
                 <h1>AI-StudyMate</h1>
                 <p class="tagline">Ваш личный умный помощник в учёбе</p>
