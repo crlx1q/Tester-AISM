@@ -3766,7 +3766,7 @@ app.post('/planner/task/:taskId/toggle', async (req, res) => {
   }
 });
 
-// Generate AI planner (simple version - can be enhanced with Gemini later)
+// Generate AI planner for specific day
 app.post('/planner/generate/:userId', async (req, res) => {
   try {
     const userId = parseInt(req.params.userId, 10);
@@ -3789,7 +3789,9 @@ app.post('/planner/generate/:userId', async (req, res) => {
       return res.status(400).json({ message: 'Gemini API key не настроен' });
     }
     
-    console.log('[PLANNER][AI] Using API key:', apiKey ? 'Available' : 'Missing');
+    // Получаем целевую дату (если не указана - сегодня)
+    const targetDate = req.body?.targetDate ? new Date(req.body.targetDate) : startOfDay();
+    console.log('[PLANNER][AI] Generating tasks for:', targetDate.toLocaleDateString('ru'));
 
     // Get recent notebook entries
     const recentEntries = await NotebookEntry.find({ userId })
@@ -3841,10 +3843,16 @@ app.post('/planner/generate/:userId', async (req, res) => {
       .map(q => `- "${q.setTitle}": ${q.score}%`)
       .join('\n');
 
-    const today = startOfDay();
     const weekStart = getMonday();
+    
+    // Форматируем дату для AI
+    const targetDateStr = targetDate.toLocaleDateString('ru', { 
+      day: 'numeric', 
+      month: 'long',
+      weekday: 'long'
+    });
 
-    const prompt = `Ты - AI-ассистент для создания персонализированного плана обучения. Проанализируй активность студента и создай оптимальный план повторения материала на неделю.
+    const prompt = `Ты - AI-ассистент для создания персонализированного плана обучения. Проанализируй активность студента и создай оптимальные задачи на КОНКРЕТНЫЙ день.
 
 **КОНТЕКСТ СТУДЕНТА:**
 
@@ -3863,34 +3871,33 @@ ${weakQuizzes || 'Нет слабых результатов'}
 ${strongQuizzes || 'Нет хороших результатов'}
 
 **ЗАДАЧА:**
-Создай план обучения на 7 дней начиная с сегодня (${today.toLocaleDateString('ru')}). 
-Используй принципы интервального повторения (spaced repetition):
-- День 1: повторить материал с низкими результатами
-- День 2-3: повторить недавние лекции
-- День 4-5: повторить отсканированные материалы
-- День 6-7: итоговое повторение сложных тем
+Создай план обучения ТОЛЬКО на ${targetDateStr}.
 
-**ВАЖНО:**
-- Создай 5-8 конкретных задач
-- Распределяй задачи по разным дням (не все на один день!)
-- Приоритет: high (срочно), medium (обычно), low (желательно)
+**САМ ОПРЕДЕЛИ сколько задач нужно создать (от 1 до 6):**
+- Если материалов мало или студент занят (мало минут в день) → 1-2 задачи
+- Если есть слабые места в квизах → 2-3 задачи с приоритетом на повторение
+- Если много материала и студент активен → 4-6 задач
+- Распределяй нагрузку умно: не перегружай
+
+**ПРАВИЛА:**
+- Приоритет: high (срочно, слабые квизы), medium (обычно), low (желательно)
 - Тип задачи: review_lecture, review_scan, quiz, reading, custom
-- Используй конкретные названия материалов из контекста
+- Используй КОНКРЕТНЫЕ названия материалов из контекста
+- Все задачи должны быть ТОЛЬКО на ${targetDateStr} (dayOffset: 0)
 
 **ФОРМАТ ОТВЕТА (СТРОГО JSON):**
 {
   "tasks": [
     {
       "dayOffset": 0,
-      "title": "Повторить: [название материала]",
+      "title": "Повторить: [конкретное название]",
       "type": "review_lecture",
-      "priority": "high",
-      "relatedId": "[id материала если есть]"
+      "priority": "high"
     }
   ]
 }
 
-dayOffset - это количество дней от сегодня (0 = сегодня, 1 = завтра, и т.д.)`;
+ВАЖНО: dayOffset всегда 0 (все задачи на один день!)`;
 
     console.log('[PLANNER][AI] Calling Gemini for smart plan generation...');
     
@@ -3914,7 +3921,7 @@ dayOffset - это количество дней от сегодня (0 = сег
     if (parsed && parsed.tasks && Array.isArray(parsed.tasks)) {
       // Use AI generated tasks
       tasks = parsed.tasks.map(aiTask => {
-        const reviewDate = new Date(today);
+        const reviewDate = new Date(targetDate);
         reviewDate.setDate(reviewDate.getDate() + (aiTask.dayOffset || 0));
 
         // Find related entry if exists
@@ -3948,15 +3955,11 @@ dayOffset - это количество дней от сегодня (0 = сег
       console.log('[PLANNER][AI] Falling back to rule-based generation');
       let taskDayOffset = 0;
 
-      // High priority: weak quizzes
+      // High priority: weak quizzes (all on target date)
       recentQuizzes.filter(q => q.score < 70).slice(0, 2).forEach((quiz) => {
-        const reviewDate = new Date(today);
-        reviewDate.setDate(reviewDate.getDate() + taskDayOffset);
-        taskDayOffset++;
-
         tasks.push({
           id: generateEntryId(),
-          date: reviewDate,
+          date: new Date(targetDate),
           title: `Повторить квиз: ${quiz.setTitle}`,
           type: 'quiz',
           completed: false,
@@ -3964,15 +3967,11 @@ dayOffset - это количество дней от сегодня (0 = сег
         });
       });
 
-      // Medium priority: recent lectures
-      recentEntries.filter(e => e.type === 'lecture').slice(0, 3).forEach((lecture) => {
-        const reviewDate = new Date(today);
-        reviewDate.setDate(reviewDate.getDate() + taskDayOffset);
-        taskDayOffset++;
-
+      // Medium priority: recent lectures (all on target date)
+      recentEntries.filter(e => e.type === 'lecture').slice(0, 2).forEach((lecture) => {
         tasks.push({
           id: generateEntryId(),
-          date: reviewDate,
+          date: new Date(targetDate),
           title: `Повторить: ${lecture.title}`,
           type: 'review_lecture',
           relatedNotebookId: lecture.id,
@@ -3981,15 +3980,11 @@ dayOffset - это количество дней от сегодня (0 = сег
         });
       });
 
-      // Low priority: scans
-      recentEntries.filter(e => e.type === 'scan').slice(0, 2).forEach((scan) => {
-        const reviewDate = new Date(today);
-        reviewDate.setDate(reviewDate.getDate() + taskDayOffset);
-        taskDayOffset++;
-
+      // Low priority: scans (all on target date)
+      recentEntries.filter(e => e.type === 'scan').slice(0, 1).forEach((scan) => {
         tasks.push({
           id: generateEntryId(),
-          date: reviewDate,
+          date: new Date(targetDate),
           title: `Просмотреть: ${scan.title}`,
           type: 'review_scan',
           relatedNotebookId: scan.id,
