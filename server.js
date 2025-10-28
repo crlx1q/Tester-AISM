@@ -1213,6 +1213,8 @@ app.use(cors({
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(cookieParser());
 app.use(express.static('public'));
+// Serve APK files statically as well to allow direct link /apk/app-release.apk
+app.use('/apk', express.static(path.join(__dirname, 'apk')));
 
 // Rate limiting
 const generalLimiter = rateLimit({
@@ -2187,7 +2189,7 @@ app.use(generalLimiter);
 
 // Serve admin panel
 app.get('/admin', (req, res) => {
-  res.sendFile(path.join(__dirname, 'admin.html'));
+  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
 // JWT Authentication Middleware
