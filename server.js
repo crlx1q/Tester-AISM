@@ -3792,12 +3792,15 @@ app.post('/planner/generate/:userId', async (req, res) => {
       .lean();
 
     const weekStart = getMonday();
+    const today = startOfDay();
     const tasks = [];
+    let taskDayOffset = 0; // Start from today
 
-    // Create review tasks for recent lectures (spaced repetition: 1, 3, 7 days)
+    // Create review tasks for recent lectures (spaced repetition)
     recentEntries.filter(e => e.type === 'lecture').slice(0, 3).forEach((lecture, idx) => {
-      const reviewDate = new Date(weekStart);
-      reviewDate.setDate(reviewDate.getDate() + idx + 1);
+      const reviewDate = new Date(today);
+      reviewDate.setDate(reviewDate.getDate() + taskDayOffset);
+      taskDayOffset++; // Next task on next day
 
       tasks.push({
         id: generateEntryId(),
@@ -3812,8 +3815,9 @@ app.post('/planner/generate/:userId', async (req, res) => {
 
     // Create review tasks for scans
     recentEntries.filter(e => e.type === 'scan').slice(0, 2).forEach((scan, idx) => {
-      const reviewDate = new Date(weekStart);
-      reviewDate.setDate(reviewDate.getDate() + idx + 3);
+      const reviewDate = new Date(today);
+      reviewDate.setDate(reviewDate.getDate() + taskDayOffset);
+      taskDayOffset++; // Next task on next day
 
       tasks.push({
         id: generateEntryId(),
@@ -3828,12 +3832,13 @@ app.post('/planner/generate/:userId', async (req, res) => {
 
     // Add quiz tasks for sets with poor performance
     recentQuizzes.filter(q => q.score < 70).slice(0, 2).forEach((quiz, idx) => {
-      const quizDate = new Date(weekStart);
-      quizDate.setDate(quizDate.getDate() + idx + 2);
+      const reviewDate = new Date(today);
+      reviewDate.setDate(reviewDate.getDate() + taskDayOffset);
+      taskDayOffset++; // Next task on next day
 
       tasks.push({
         id: generateEntryId(),
-        date: quizDate,
+        date: reviewDate,
         title: `Повторить квиз: ${quiz.setTitle}`,
         type: 'quiz',
         completed: false,
