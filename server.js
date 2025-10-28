@@ -759,6 +759,7 @@ const studyStatsDailySchema = new mongoose.Schema({
   chatSessionsCount: { type: Number, default: 0 },
   cardsCreated: { type: Number, default: 0 },
   quizzesTaken: { type: Number, default: 0 },
+  notesCreated: { type: Number, default: 0 },
   updatedAt: { type: Date, default: Date.now },
 }, { versionKey: false });
 
@@ -3376,12 +3377,23 @@ app.post('/stats/report', async (req, res) => {
     if (type === 'recording') updates.recordingsCount = 1;
     if (type === 'chat') updates.chatSessionsCount = 1;
     if (type === 'quiz') updates.quizzesTaken = 1;
+    if (type === 'notebook') updates.notesCreated = 1; // Добавляем поддержку для создания конспектов
     if (minutes) updates.studyMinutes = minutes;
 
     await updateStats(userId, updates);
 
-    console.log(`[STATS] Activity reported for user ${userId}: ${type}`);
-    res.status(200).json({ success: true, message: 'Активность зафиксирована' });
+    // ВАЖНО: Обновляем streak при любой активности!
+    updateUserStreak(user);
+    await user.save();
+
+    console.log(`[STATS] Activity reported for user ${userId}: ${type}, streak updated to ${user.streak.current}`);
+    
+    // Возвращаем обновленные данные streak
+    res.status(200).json({ 
+      success: true, 
+      message: 'Активность зафиксирована',
+      streak: serializeStreak(user.streak)
+    });
   } catch (error) {
     console.error('[STATS][ERROR]', error);
     res.status(500).json({ message: 'Не удалось зафиксировать активность' });
