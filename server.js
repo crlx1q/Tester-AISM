@@ -3774,14 +3774,22 @@ app.post('/planner/generate/:userId', async (req, res) => {
       return res.status(400).json({ message: 'Некорректный ID пользователя' });
     }
 
-    const user = await User.findOne({ id: userId });
+    const user = await findUserById(userId);
     if (!user) {
       return res.status(404).json({ message: 'Пользователь не найден' });
     }
 
-    if (!user.geminiApiKey) {
+    // Пробуем взять ключ пользователя, если нет - берём глобальный
+    let apiKey = user.geminiApiKey;
+    if (!apiKey) {
+      apiKey = await loadGeminiKey();
+    }
+    
+    if (!apiKey) {
       return res.status(400).json({ message: 'Gemini API key не настроен' });
     }
+    
+    console.log('[PLANNER][AI] Using API key:', apiKey ? 'Available' : 'Missing');
 
     // Get recent notebook entries
     const recentEntries = await NotebookEntry.find({ userId })
@@ -3896,7 +3904,7 @@ dayOffset - это количество дней от сегодня (0 = сег
       }
     };
 
-    const geminiResult = await callGemini(user.geminiApiKey, payload);
+    const geminiResult = await callGemini(apiKey, payload);
     const { parsed } = parseGeminiJson(geminiResult);
 
     console.log('[PLANNER][AI] Gemini response:', JSON.stringify(parsed).slice(0, 300));
