@@ -3647,6 +3647,25 @@ app.delete('/notebook/:userId/:entryId', async (req, res) => {
       return res.status(404).json({ message: 'Запись не найдена' });
     }
 
+    // Удаляем связанный ресурс (с base64 изображением) при удалении записи
+    if (entry.linkedResourceId) {
+      try {
+        if (entry.type === 'scan') {
+          await AiScanNote.deleteOne({ id: entry.linkedResourceId, userId });
+          console.log(`[NOTEBOOK] Deleted linked AiScanNote: ${entry.linkedResourceId}`);
+        } else if (entry.type === 'lecture') {
+          await AiLecture.deleteOne({ id: entry.linkedResourceId, userId });
+          console.log(`[NOTEBOOK] Deleted linked AiLecture: ${entry.linkedResourceId}`);
+        } else if (entry.type === 'session') {
+          await AiSession.deleteOne({ id: entry.linkedResourceId, userId });
+          console.log(`[NOTEBOOK] Deleted linked AiSession: ${entry.linkedResourceId}`);
+        }
+      } catch (linkedError) {
+        console.error('[NOTEBOOK][WARN] Could not delete linked resource:', linkedError);
+        // Не останавливаем процесс если связанный ресурс не удалился
+      }
+    }
+
     console.log(`[NOTEBOOK] Entry deleted: ${entryId}`);
     res.status(200).json({ success: true, message: 'Запись удалена' });
   } catch (error) {
