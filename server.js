@@ -3873,6 +3873,83 @@ app.post('/planner/generate/:userId', async (req, res) => {
   }
 });
 
+// Add custom task to planner
+app.post('/planner/task/:userId', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId, 10);
+    const { date, title, type = 'custom', priority = 'medium' } = req.body;
+
+    if (!Number.isFinite(userId) || !date || !title) {
+      return res.status(400).json({ message: 'Некорректные данные' });
+    }
+
+    const user = await findUserById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'Пользователь не найден' });
+    }
+
+    const newTask = {
+      id: generateEntryId(),
+      date: new Date(date),
+      title: title,
+      type: type,
+      completed: false,
+      priority: priority,
+    };
+
+    const planner = await PlannerSchedule.findOneAndUpdate(
+      { userId },
+      {
+        $push: { tasks: newTask },
+        $set: { updatedAt: new Date() },
+      },
+      { upsert: true, new: true }
+    ).lean();
+
+    console.log(`[PLANNER] Added task for user ${userId}: ${title}`);
+    res.status(200).json({ success: true, data: planner });
+  } catch (error) {
+    console.error('[PLANNER][ERROR]', error);
+    res.status(500).json({ message: 'Не удалось добавить задачу' });
+  }
+});
+
+// Delete task from planner
+app.delete('/planner/task/:userId/:taskId', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId, 10);
+    const { taskId } = req.params;
+
+    if (!Number.isFinite(userId) || !taskId) {
+      return res.status(400).json({ message: 'Некорректные данные' });
+    }
+
+    const user = await findUserById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'Пользователь не найден' });
+    }
+
+    const planner = await PlannerSchedule.findOneAndUpdate(
+      { userId },
+      {
+        $pull: { tasks: { id: taskId } },
+        $set: { updatedAt: new Date() },
+      },
+      { new: true }
+    ).lean();
+
+    if (!planner) {
+      return res.status(404).json({ message: 'План не найден' });
+    }
+
+    console.log(`[PLANNER] Deleted task ${taskId} for user ${userId}`);
+    res.status(200).json({ success: true, data: planner });
+  } catch (error) {
+    console.error('[PLANNER][ERROR]', error);
+    res.status(500).json({ message: 'Не удалось удалить задачу' });
+  }
+});
+
 // ========== AI EXTENDED RESOURCES API ==========
 
 // Create AI Lecture from voice recording
