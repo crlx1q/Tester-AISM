@@ -1,0 +1,1604 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>AIStudyMate Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background: radial-gradient(circle at top, rgba(99,102,241,0.1), transparent 60%), #f3f4f6; min-height: 100vh; transition: background 0.3s ease, color 0.3s ease; }
+        .glass-card { background: rgba(255,255,255,0.9); backdrop-filter: blur(22px); box-shadow: 0 20px 45px rgba(99,102,241,0.15); transition: background 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease; }
+        .scrollbar-hidden::-webkit-scrollbar { display: none; }
+        .scrollbar-hidden { -ms-overflow-style: none; scrollbar-width: none; }
+        .fade-in { animation: fadeIn 0.4s ease-in-out both; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+        body.dark { background: radial-gradient(circle at top, rgba(59,130,246,0.08), transparent 60%), #0f172a; color: #e2e8f0; }
+        body.dark .glass-card { background: rgba(15,23,42,0.86); box-shadow: 0 20px 45px rgba(13,16,43,0.5); border-color: rgba(148,163,184,0.22) !important; }
+        body.dark .text-gray-900 { color: #f8fafc !important; }
+        body.dark .text-gray-800 { color: #e2e8f0 !important; }
+        body.dark .text-gray-700 { color: #e2e8f0 !important; }
+        body.dark .text-gray-600 { color: #cbd5f5 !important; }
+        body.dark .text-gray-500 { color: #94a3b8 !important; }
+        body.dark .text-gray-400 { color: #7b8dbb !important; }
+        body.dark .bg-white { background-color: rgba(15,23,42,0.9) !important; }
+        body.dark .bg-white\/90 { background-color: rgba(15,23,42,0.9) !important; }
+        body.dark .bg-white\/80 { background-color: rgba(15,23,42,0.82) !important; }
+        body.dark .bg-indigo-100\/70 { background-color: rgba(99,102,241,0.25) !important; color: #c7d2fe !important; }
+        body.dark .bg-gray-50\/80 { background-color: rgba(30,41,59,0.7) !important; }
+        body.dark .bg-gray-100 { background-color: rgba(30,41,59,0.6) !important; }
+        body.dark .bg-gray-100\/70 { background-color: rgba(30,41,59,0.6) !important; }
+        body.dark .bg-gray-100\/60 { background-color: rgba(30,41,59,0.55) !important; }
+        body.dark .bg-gray-100\/80 { background-color: rgba(30,41,59,0.65) !important; }
+        body.dark .bg-gray-200 { background-color: rgba(51,65,85,0.8) !important; }
+        body.dark .bg-indigo-50 { background-color: rgba(99,102,241,0.2) !important; }
+        body.dark .bg-sky-50 { background-color: rgba(56,189,248,0.2) !important; }
+        body.dark .bg-emerald-100 { background-color: rgba(16,185,129,0.25) !important; }
+        body.dark .border-gray-100 { border-color: rgba(148,163,184,0.25) !important; }
+        body.dark .border-gray-200 { border-color: rgba(148,163,184,0.2) !important; }
+        body.dark input,
+        body.dark textarea,
+        body.dark select { background-color: rgba(15,23,42,0.82) !important; border-color: rgba(148,163,184,0.2) !important; color: #e2e8f0 !important; }
+        body.dark input::placeholder,
+        body.dark textarea::placeholder { color: #64748b !important; }
+        body.dark .bg-white\/90 input,
+        body.dark .bg-white\/90 textarea,
+        body.dark .bg-white\/90 select { background-color: rgba(17,24,39,0.7) !important; }
+        body.dark .text-indigo-600 { color: #a5b4fc !important; }
+        body.dark .text-sky-600 { color: #7dd3fc !important; }
+        body.dark .text-emerald-600 { color: #6ee7b7 !important; }
+        body.dark button { transition: background 0.3s ease, color 0.3s ease, border-color 0.3s ease; }
+
+        .theme-toggle-track { transition: background 0.2s ease; }
+        .theme-toggle-thumb { transition: transform 0.2s ease, background 0.2s ease; }
+        label input:checked + span .theme-toggle-track { background: linear-gradient(135deg, rgba(99,102,241,0.6), rgba(129,140,248,0.8)); }
+        label input:checked + span .theme-toggle-thumb { transform: translateX(20px); background: #4f46e5; }
+        body.dark label input:checked + span .theme-toggle-thumb { background: #c7d2fe; }
+
+        .modal-backdrop { background: rgba(15,23,42,0.45); }
+        .modal-hidden { opacity: 0; pointer-events: none; }
+        .modal-visible { opacity: 1; pointer-events: auto; }
+        .modal-panel { transform: translateY(16px); transition: transform 0.25s ease, opacity 0.25s ease; }
+        .modal-visible .modal-panel { transform: translateY(0); }
+
+        .badge-option input:checked + .badge-option__body { border-color: rgba(99,102,241,0.6); background: rgba(99,102,241,0.08); color: #4f46e5; }
+        body.dark .badge-option input:checked + .badge-option__body { border-color: rgba(129,140,248,0.9); background: rgba(129,140,248,0.12); color: #c7d2fe; }
+    </style>
+</head>
+<body class="text-gray-900">
+    <button id="themeToggle" class="hidden fixed top-6 right-6 z-50 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/90 border border-gray-200 shadow-lg text-sm font-semibold text-gray-600 hover:text-indigo-600 hover:border-indigo-200 transition">
+        <i data-lucide="moon" class="w-4 h-4"></i>
+        <span id="themeToggleLabel">Тёмная тема</span>
+    </button>
+
+    <div class="min-h-screen flex flex-col items-center justify-center px-4 py-10">
+        <div class="w-full max-w-6xl">
+            <header class="mb-10 text-center fade-in">
+                <div class="inline-flex items-center gap-3 px-5 py-2.5 rounded-full bg-indigo-100/70 text-indigo-600 text-sm font-medium mb-5 shadow-sm">
+                    <i data-lucide="shield-check" class="w-4 h-4"></i>
+                    Панель управления AIStudyMate
+                </div>
+                <h1 class="text-4xl md:text-5xl font-bold text-gray-900">Админ-панель AIStudyMate</h1>
+                <p class="mt-4 text-gray-500">Управляйте пользователями, обновлениями и статусом сервера в одном месте.</p>
+            </header>
+
+            <!-- Login Card -->
+            <div id="loginForm" class="glass-card rounded-3xl border border-white/80 p-8 md:p-12 fade-in shadow-xl">
+                <div class="flex items-center gap-3 text-indigo-500 font-semibold text-sm uppercase tracking-wide mb-6">
+                    <i data-lucide="log-in" class="w-5 h-5"></i>
+                    Авторизация администратора
+                </div>
+                <h2 class="text-3xl font-bold text-gray-900 mb-2">Вход в админку</h2>
+                <p class="text-gray-500 mb-8">Введите защищённый пароль для доступа к панели управления.</p>
+
+                <form id="loginFormElement" class="space-y-6">
+                    <div>
+                        <label for="password" class="block text-sm font-medium text-gray-500 mb-2">Пароль администратора</label>
+                        <div class="relative">
+                            <input type="password" id="password" required class="w-full rounded-2xl border border-gray-200 bg-white/80 px-4 py-3 text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all" placeholder="Введите пароль">
+                            <button type="button" id="togglePassword" class="absolute inset-y-0 right-0 flex items-center px-4 text-gray-400 hover:text-indigo-500 transition" aria-label="Показать пароль">
+                                <i data-lucide="eye" class="w-5 h-5"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <button type="submit" class="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-3 rounded-2xl shadow-lg shadow-indigo-500/30 transition-all">Войти</button>
+                </form>
+            </div>
+
+            <!-- Admin Dashboard -->
+            <div id="adminPanel" class="hidden fade-in">
+                <div class="grid md:grid-cols-[280px,1fr] gap-6 md:gap-8 items-start">
+                    <!-- Sidebar -->
+                    <aside class="glass-card rounded-3xl border border-white/80 p-6 space-y-6 shadow-xl">
+                        <div>
+                            <p class="text-xs font-semibold text-gray-500 uppercase">Статус доступа</p>
+                            <h3 class="mt-2 text-lg font-bold text-indigo-600">Администратор
+                                <span class="ml-2 inline-flex items-center gap-1 px-2 py-1 bg-indigo-50 text-indigo-500 rounded-full text-xs">
+                                    <i data-lucide="shield" class="w-3.5 h-3.5"></i>
+                                    Полный доступ
+                                </span>
+                            </h3>
+                        </div>
+
+                        <button id="logoutBtn" class="w-full flex items-center justify-center gap-2 bg-white text-gray-700 font-semibold py-2.5 rounded-2xl border border-gray-200 hover:border-indigo-200 hover:text-indigo-600 transition">
+                            <i data-lucide="log-out" class="w-4 h-4"></i>
+                            Выйти
+                        </button>
+
+                        <div class="pt-4 border-t border-gray-100 space-y-4">
+                            <div>
+                                <p class="text-xs font-semibold text-gray-500 uppercase mb-2">Быстрые действия</p>
+                                <div class="space-y-3">
+                                    <button id="reloadDbBtn" class="w-full flex items-center justify-between gap-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 font-semibold px-4 py-3 rounded-xl transition">
+                                        <span class="flex items-center gap-2">
+                                            <i data-lucide="database" class="w-4 h-4"></i>
+                                            Перезагрузить базу
+                                        </span>
+                                        <i data-lucide="refresh-ccw" class="w-4 h-4"></i>
+                                    </button>
+                                    <button id="reloadBadgesBtn" class="w-full flex items-center justify-between gap-3 bg-sky-50 hover:bg-sky-100 text-sky-600 font-semibold px-4 py-3 rounded-xl transition">
+                                        <span class="flex items-center gap-2">
+                                            <i data-lucide="award" class="w-4 h-4"></i>
+                                            Обновить бейджи
+                                        </span>
+                                        <i data-lucide="sparkles" class="w-4 h-4"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="bg-gray-50/80 rounded-2xl p-4 border border-gray-100">
+                                <p class="text-xs font-semibold text-gray-500 uppercase mb-2">Статус сервера</p>
+                                <div id="serverStatus" class="text-sm text-gray-700 space-y-1">
+                                    <p class="flex items-center gap-2 text-gray-400">
+                                        <i data-lucide="loader" class="w-4 h-4 animate-spin"></i>
+                                        Загрузка...
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </aside>
+
+                    <!-- Main Content -->
+                    <main class="space-y-6">
+                        <section class="glass-card rounded-3xl border border-white/80 p-6 md:p-8 shadow-xl">
+                            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+                                <div>
+                                    <h2 class="text-2xl font-semibold text-gray-900">Пользователи</h2>
+                                    <p class="text-gray-500 text-sm">Просматривайте и управляйте пользователями, статусами PRO и бейджами.</p>
+                                </div>
+                                <div class="flex items-center gap-3 bg-gray-100/60 rounded-full px-4 py-2 text-sm text-gray-500">
+                                    <i data-lucide="check-circle" class="w-4 h-4"></i>
+                                    <span id="usersCount">0 пользователей</span>
+                                </div>
+                            </div>
+
+                            <div class="relative">
+                                <i data-lucide="search" class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5"></i>
+                                <input id="searchUser" type="text" class="w-full rounded-2xl border border-transparent bg-gray-100/70 pl-12 pr-4 py-3 text-sm text-gray-700 focus:ring-2 focus:ring-indigo-500 focus:bg-white transition" placeholder="Поиск по email, имени или ID">
+                            </div>
+
+                            <div id="usersList" class="mt-6 space-y-4 max-h-[520px] overflow-y-auto pr-1 scrollbar-hidden">
+                                <div class="p-6 border border-dashed border-gray-200 rounded-2xl text-center text-gray-400">
+                                    <p>Список пользователей будет показан после загрузки.</p>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="glass-card rounded-3xl border border-white/80 p-6 md:p-8 shadow-xl" id="registrationSection">
+                            <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-6">
+                                <div>
+                                    <h2 class="text-2xl font-semibold text-gray-900">Регистрация</h2>
+                                    <p class="text-gray-500 text-sm">Управляйте доступностью регистрации и сообщением для пользователей.</p>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <button id="refreshRegistrationBtn" class="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 text-sm font-semibold text-gray-500 hover:text-indigo-600 hover:border-indigo-200 transition">
+                                        <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                                        Обновить
+                                    </button>
+                                </div>
+                            </div>
+                            <form id="registrationForm" class="space-y-6">
+                                <div class="flex flex-wrap items-center gap-4">
+                                    <label class="flex items-center gap-3 cursor-pointer select-none">
+                                        <input type="checkbox" id="registrationFrozen" class="sr-only">
+                                        <span class="relative inline-flex h-6 w-11 items-center">
+                                            <span class="theme-toggle-track h-6 w-11 rounded-full bg-gray-200 transition"></span>
+                                            <span class="theme-toggle-thumb absolute left-1 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform"></span>
+                                        </span>
+                                        <span class="text-sm font-semibold text-gray-700">
+                                            Заморозить регистрацию
+                                        </span>
+                                    </label>
+                                    <p id="registrationStatusLabel" class="text-sm text-gray-500"></p>
+                                </div>
+                                <div>
+                                    <label for="registrationMessage" class="block text-sm font-semibold text-gray-600 mb-2">Сообщение для пользователей</label>
+                                    <textarea id="registrationMessage" rows="3" class="w-full rounded-2xl border border-gray-200 bg-white/90 px-4 py-3 text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition" placeholder="Регистрация временно недоступна..."></textarea>
+                                </div>
+                                <div class="flex flex-wrap items-center gap-3">
+                                    <button type="submit" id="registrationSaveBtn" class="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-indigo-500 hover:bg-indigo-600 text-white font-semibold shadow-lg shadow-indigo-500/30 transition">
+                                        <i data-lucide="save" class="w-4 h-4"></i>
+                                        Сохранить
+                                    </button>
+                                    <span id="registrationUpdatedAt" class="text-xs text-gray-400"></span>
+                                </div>
+                            </form>
+                        </section>
+
+                        <!-- Gemini API Key Management -->
+                        <section class="glass-card rounded-3xl border border-white/80 p-6 md:p-8 shadow-xl" id="aiGeminiSection">
+                            <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-6">
+                                <div>
+                                    <h2 class="text-2xl font-semibold text-gray-900">Gemini API ключ</h2>
+                                    <p class="text-gray-500 text-sm">Хранится зашифрованным в базе. Используется только сервером для проксирования запросов AI.</p>
+                                </div>
+                                <div class="flex items-center gap-3 bg-gray-100/60 rounded-full px-4 py-2 text-sm text-gray-500">
+                                    <i data-lucide="key" class="w-4 h-4"></i>
+                                    <span id="geminiKeyStatus">Статус: не загружен</span>
+                                </div>
+                            </div>
+
+                            <form id="geminiKeyForm" class="space-y-4">
+                                <div class="grid md:grid-cols-[1fr,auto] gap-3 items-center">
+                                    <div class="relative">
+                                        <label for="geminiKeyInput" class="block text-sm font-semibold text-gray-600 mb-2">Новый ключ Gemini</label>
+                                        <input type="password" id="geminiKeyInput" class="w-full rounded-2xl border border-gray-200 bg-white/90 px-4 py-3 text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition" placeholder="AIza..." autocomplete="off">
+                                        <button type="button" id="geminiKeyReveal" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-indigo-500">
+                                            <i data-lucide="eye" class="w-5 h-5"></i>
+                                        </button>
+                                    </div>
+                                    <button type="submit" id="geminiKeySaveBtn" class="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-indigo-500 hover:bg-indigo-600 text-white font-semibold shadow-lg shadow-indigo-500/30 transition">
+                                        <i data-lucide="save" class="w-4 h-4"></i>
+                                        Сохранить ключ
+                                    </button>
+                                </div>
+                                <p class="text-xs text-gray-400">Подсказка: ключ будет зашифрован симметрично (AES-GCM) с помощью AI_KEYS_SECRET на сервере.</p>
+                            </form>
+                        </section>
+
+                        <section class="glass-card rounded-3xl border border-white/80 p-6 md:p-8 shadow-xl" id="proPlansSection">
+                            <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-6">
+                                <div>
+                                    <h2 class="text-2xl font-semibold text-gray-900">Тарифы PRO</h2>
+                                    <p class="text-gray-500 text-sm">Просматривайте доступные тарифы и управляйте сроками действия PRO у пользователей.</p>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <button id="refreshProPlansBtn" class="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 text-sm font-semibold text-gray-500 hover:text-indigo-600 hover:border-indigo-200 transition">
+                                        <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                                        Обновить
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="proPlansList" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"></div>
+                        </section>
+
+                        <section class="glass-card rounded-3xl border border-white/80 p-6 md:p-8 shadow-xl" id="updateSection">
+                            <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-6">
+                                <div>
+                                    <h2 class="text-2xl font-semibold text-gray-900">Обновление приложения</h2>
+                                    <p class="text-gray-500 text-sm">Публикуйте информацию о новой версии приложения и уведомляйте пользователей.</p>
+                                </div>
+                                <div class="flex items-center gap-3 text-sm text-gray-500" id="latestUpdateInfo"></div>
+                            </div>
+                            <form id="publishUpdateForm" class="space-y-5">
+                                <div class="grid md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label for="updateVersion" class="block text-sm font-semibold text-gray-600 mb-2">Версия</label>
+                                        <input type="text" id="updateVersion" required class="w-full rounded-2xl border border-gray-200 bg-white/90 px-4 py-3 text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition" placeholder="1.2.0">
+                                    </div>
+                                    <div>
+                                        <label for="apkFile" class="block text-sm font-semibold text-gray-600 mb-2">APK файл</label>
+                                        <input type="file" id="apkFile" accept=".apk" class="w-full rounded-2xl border border-gray-200 bg-white/90 px-4 py-3 text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                                        <div id="apkUploadProgress" class="mt-2 hidden">
+                                            <div class="flex items-center justify-between text-xs text-gray-600 mb-1">
+                                                <span id="apkUploadStatus">Загрузка...</span>
+                                                <span id="apkUploadPercent">0%</span>
+                                            </div>
+                                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                                <div id="apkUploadBar" class="bg-indigo-500 h-2 rounded-full transition-all" style="width: 0%"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label for="updateTitle" class="block text-sm font-semibold text-gray-600 mb-2">Заголовок</label>
+                                    <input type="text" id="updateTitle" class="w-full rounded-2xl border border-gray-200 bg-white/90 px-4 py-3 text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition" placeholder="Большое обновление AIStudyMate">
+                                </div>
+                                <div>
+                                    <label for="updateMessage" class="block text-sm font-semibold text-gray-600 mb-2">Описание</label>
+                                    <textarea id="updateMessage" rows="4" class="w-full rounded-2xl border border-gray-200 bg-white/90 px-4 py-3 text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition" placeholder="Список изменений..."></textarea>
+                                </div>
+                                <div class="flex flex-wrap items-center gap-3">
+                                    <button type="submit" id="publishUpdateBtn" class="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-indigo-500 hover:bg-indigo-600 text-white font-semibold shadow-lg shadow-indigo-500/30 transition">
+                                        <i data-lucide="upload" class="w-4 h-4"></i>
+                                        Опубликовать
+                                    </button>
+                                    <span id="publishUpdateStatus" class="text-xs text-gray-400"></span>
+                                </div>
+                            </form>
+                        </section>
+                    </main>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="badgeModal" class="fixed inset-0 z-50 modal-backdrop modal-hidden flex items-center justify-center px-4">
+        <div class="modal-panel glass-card rounded-3xl border border-white/80 p-6 md:p-7 w-full max-w-2xl shadow-2xl">
+            <div class="flex items-start justify-between gap-4 mb-5">
+                <div>
+                    <h3 class="text-2xl font-semibold text-gray-900">Управление бейджами</h3>
+                    <p class="text-sm text-gray-500">Выберите бейджи для пользователя. Можно добавить новый ключ вручную.</p>
+                </div>
+                <button type="button" data-modal-close="badge" class="rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 p-2 transition" aria-label="Закрыть">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <form id="badgeForm" class="space-y-6">
+                <div>
+                    <p class="text-xs uppercase text-gray-500 font-semibold mb-3">Доступные бейджи</p>
+                    <div id="badgeOptions" class="grid gap-3 sm:grid-cols-2 md:grid-cols-3 max-h-64 overflow-y-auto pr-1 scrollbar-hidden"></div>
+                </div>
+                <div class="grid md:grid-cols-[1fr,auto] gap-3 items-end">
+                    <div>
+                        <label for="badgeCustomInput" class="block text-sm font-semibold text-gray-600 mb-2">Новый бейдж (ключ)</label>
+                        <input type="text" id="badgeCustomInput" class="w-full rounded-2xl border border-gray-200 bg-white/90 px-4 py-3 text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition" placeholder="Например, mentor">
+                        <p class="text-xs text-gray-400 mt-2">Ключ будет автоматически нормализован (строчные буквы, без пробелов).</p>
+                    </div>
+                    <button type="button" id="badgeAddCustomBtn" class="inline-flex items-center gap-2 px-4 py-3 rounded-2xl border border-dashed border-indigo-300 text-indigo-600 font-semibold hover:bg-indigo-50 transition">
+                        <i data-lucide="plus" class="w-4 h-4"></i>
+                        Добавить
+                    </button>
+                </div>
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div id="badgeSelectedCount" class="text-xs text-gray-500"></div>
+                    <div class="flex items-center gap-3">
+                        <button type="button" data-modal-close="badge" class="px-4 py-3 rounded-2xl border border-gray-200 text-gray-500 hover:text-indigo-600 hover:border-indigo-200 transition">Отмена</button>
+                        <button type="submit" id="badgeSaveBtn" class="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-indigo-500 hover:bg-indigo-600 text-white font-semibold shadow-lg shadow-indigo-500/30 transition">
+                            <i data-lucide="check" class="w-4 h-4"></i>
+                            Сохранить
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="proModal" class="fixed inset-0 z-50 modal-backdrop modal-hidden flex items-center justify-center px-4">
+        <div class="modal-panel glass-card rounded-3xl border border-white/80 p-6 md:p-7 w-full max-w-xl shadow-2xl">
+            <div class="flex items-start justify-between gap-4 mb-5">
+                <div>
+                    <h3 class="text-2xl font-semibold text-gray-900">Управление PRO</h3>
+                    <p class="text-sm text-gray-500">Активируйте или отключите PRO и выберите подходящий тариф.</p>
+                </div>
+                <button type="button" data-modal-close="pro" class="rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 p-2 transition" aria-label="Закрыть">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <form id="proForm" class="space-y-6">
+                <div class="flex items-center gap-3">
+                    <label class="flex items-center gap-3 cursor-pointer select-none">
+                        <input type="checkbox" id="proStatus" class="sr-only">
+                        <span class="relative inline-flex h-6 w-11 items-center">
+                            <span class="theme-toggle-track h-6 w-11 rounded-full bg-gray-200 transition"></span>
+                            <span class="theme-toggle-thumb absolute left-1 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform"></span>
+                        </span>
+                        <span class="text-sm font-semibold text-gray-700">Активировать PRO</span>
+                    </label>
+                    <span id="proStatusLabel" class="text-sm text-gray-500"></span>
+                </div>
+                <div id="proPlanChooser" class="space-y-3">
+                    <p class="text-xs uppercase text-gray-500 font-semibold">Тарифы</p>
+                    <div id="proPlanOptions" class="grid gap-3 sm:grid-cols-2"></div>
+                </div>
+                <div class="space-y-2 text-sm text-gray-500" id="proCurrentInfo"></div>
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div class="text-xs text-gray-500" id="proUpdatedAt"></div>
+                    <div class="flex items-center gap-3">
+                        <button type="button" data-modal-close="pro" class="px-4 py-3 rounded-2xl border border-gray-200 text-gray-500 hover:text-indigo-600 hover:border-indigo-200 transition">Отмена</button>
+                        <button type="submit" id="proSaveBtn" class="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-indigo-500 hover:bg-indigo-600 text-white font-semibold shadow-lg shadow-indigo-500/30 transition">
+                            <i data-lucide="check" class="w-4 h-4"></i>
+                            Добавить
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = window.location.origin;
+        const THEME_KEY = 'adminTheme';
+        let token = localStorage.getItem('adminToken');
+
+        const loginForm = document.getElementById('loginForm');
+        const adminPanel = document.getElementById('adminPanel');
+        const passwordInput = document.getElementById('password');
+        const togglePasswordBtn = document.getElementById('togglePassword');
+        const usersList = document.getElementById('usersList');
+        const usersCount = document.getElementById('usersCount');
+        const searchInput = document.getElementById('searchUser');
+        const serverStatus = document.getElementById('serverStatus');
+        const themeToggle = document.getElementById('themeToggle');
+        const themeToggleLabel = document.getElementById('themeToggleLabel');
+        const themeToggleIcon = themeToggle.querySelector('i');
+        const badgeModal = document.getElementById('badgeModal');
+        const badgeForm = document.getElementById('badgeForm');
+        const badgeOptions = document.getElementById('badgeOptions');
+        const badgeSelectedCount = document.getElementById('badgeSelectedCount');
+        const badgeAddCustomBtn = document.getElementById('badgeAddCustomBtn');
+        const badgeCustomInput = document.getElementById('badgeCustomInput');
+        const proModal = document.getElementById('proModal');
+        const proForm = document.getElementById('proForm');
+        const proStatusCheckbox = document.getElementById('proStatus');
+        const proStatusLabel = document.getElementById('proStatusLabel');
+        const proPlanOptions = document.getElementById('proPlanOptions');
+        const proPlanChooser = document.getElementById('proPlanChooser');
+        const proCurrentInfo = document.getElementById('proCurrentInfo');
+        const proUpdatedAt = document.getElementById('proUpdatedAt');
+        const registrationForm = document.getElementById('registrationForm');
+        const registrationFrozen = document.getElementById('registrationFrozen');
+        const registrationMessage = document.getElementById('registrationMessage');
+        const registrationStatusLabel = document.getElementById('registrationStatusLabel');
+        const registrationUpdatedAt = document.getElementById('registrationUpdatedAt');
+        const refreshRegistrationBtn = document.getElementById('refreshRegistrationBtn');
+        const proPlansList = document.getElementById('proPlansList');
+        const refreshProPlansBtn = document.getElementById('refreshProPlansBtn');
+        const publishUpdateForm = document.getElementById('publishUpdateForm');
+        const publishUpdateBtn = document.getElementById('publishUpdateBtn');
+        const publishUpdateStatus = document.getElementById('publishUpdateStatus');
+        const latestUpdateInfo = document.getElementById('latestUpdateInfo');
+        // Gemini key elements
+        const geminiKeyForm = document.getElementById('geminiKeyForm');
+        const geminiKeyInput = document.getElementById('geminiKeyInput');
+        const geminiKeyReveal = document.getElementById('geminiKeyReveal');
+        const geminiKeyStatus = document.getElementById('geminiKeyStatus');
+        const geminiKeySaveBtn = document.getElementById('geminiKeySaveBtn');
+
+        let availableBadges = [];
+        let proPlans = [];
+        let currentBadgeUser = null;
+        let currentProUser = null;
+        const userCache = new Map();
+
+        const togglePasswordVisibility = () => {
+            const isPassword = passwordInput.type === 'password';
+            passwordInput.type = isPassword ? 'text' : 'password';
+            togglePasswordBtn.innerHTML = isPassword
+                ? '<i data-lucide="eye-off" class="w-5 h-5"></i>'
+                : '<i data-lucide="eye" class="w-5 h-5"></i>';
+            lucide.createIcons();
+        };
+
+        togglePasswordBtn.addEventListener('click', togglePasswordVisibility);
+
+        initializeTheme();
+
+        if (token) {
+            verifyToken();
+        }
+
+        let socket;
+
+        function connectWebSocket() {
+            const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${wsProtocol}//${window.location.host}/updates`;
+            socket = new WebSocket(wsUrl);
+
+            socket.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+
+            socket.onclose = (event) => {
+                console.log('WebSocket closed, reconnecting...', event.code, event.reason);
+                setTimeout(connectWebSocket, 3000);
+            };
+
+            socket.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'userUpdate') {
+                        loadUsers();
+                        loadProPlans();
+                    } else if (data.type === 'serverStatusUpdate') {
+                        loadServerStatus();
+                        loadLatestUpdate();
+                    }
+                } catch (error) {
+                    console.error('WebSocket message parse error:', error);
+                }
+            };
+        }
+
+        document.getElementById('loginFormElement').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const password = passwordInput.value;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/admin/login`, {
+                    method: 'POST',
+                    mode: 'cors',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    token = data.token;
+                    localStorage.setItem('adminToken', token);
+                    showAdminPanel();
+                    loadUsers();
+                    loadServerStatus();
+                    loadAvailableBadges();
+                    loadProPlans();
+                    loadRegistrationSettings();
+                    loadLatestUpdate();
+                    connectWebSocket();
+                    // Load Gemini key status
+                    loadGeminiKeyStatus();
+                    passwordInput.value = '';
+                } else {
+                    showToast(data.message || 'Ошибка входа', 'error');
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                showToast('Не удалось подключиться к серверу', 'error');
+            }
+        });
+
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            localStorage.removeItem('adminToken');
+            token = null;
+            showLoginPanel();
+            showToast('Вы вышли из панели', 'info');
+        });
+
+        document.getElementById('reloadDbBtn').addEventListener('click', async () => {
+            if (!confirm('Перезагрузить базу данных пользователей?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/admin/reload-db`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    showToast('База данных перезагружена', 'success');
+                    loadUsers();
+                } else {
+                    showToast(data.message || 'Не удалось перезагрузить базу', 'error');
+                }
+            } catch (error) {
+                console.error('Reload DB error:', error);
+                showToast('Ошибка подключения при перезагрузке', 'error');
+            }
+        });
+
+        document.getElementById('reloadBadgesBtn').addEventListener('click', async () => {
+            try {
+                const response = await fetch(`${API_BASE_URL}/admin/reload-badges`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    showToast('Бейджи обновлены', 'success');
+                } else {
+                    showToast(data.message || 'Не удалось обновить бейджи', 'error');
+                }
+            } catch (error) {
+                console.error('Reload badges error:', error);
+                showToast('Ошибка подключения при обновлении бейджей', 'error');
+            }
+        });
+
+        searchInput.addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            const userCards = document.querySelectorAll('[data-user-card="true"]');
+
+            userCards.forEach(card => {
+                const email = card.getAttribute('data-email').toLowerCase();
+                const name = card.getAttribute('data-name').toLowerCase();
+                const id = card.getAttribute('data-id').toLowerCase();
+
+                const matches = email.includes(searchTerm) || name.includes(searchTerm) || id.includes(searchTerm);
+                card.classList.toggle('hidden', !matches);
+            });
+        });
+
+        async function verifyToken() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/admin/verify-token`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (response.ok) {
+                    showAdminPanel();
+                    loadUsers();
+                    loadServerStatus();
+                    loadAvailableBadges();
+                    loadProPlans();
+                    loadRegistrationSettings();
+                    loadLatestUpdate();
+                    connectWebSocket();
+                    loadGeminiKeyStatus();
+                } else {
+                    localStorage.removeItem('adminToken');
+                    showLoginPanel();
+                }
+            } catch (error) {
+                console.error('Token verification error:', error);
+                localStorage.removeItem('adminToken');
+                showLoginPanel();
+            }
+        }
+
+        async function loadAvailableBadges() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/admin/badges`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load badges');
+                }
+
+                const badges = await response.json();
+                availableBadges = Array.isArray(badges) ? badges : [];
+                renderBadgeOptions();
+            } catch (error) {
+                console.error('Load badges error:', error);
+                availableBadges = [];
+                renderBadgeOptions();
+            }
+        }
+
+        async function updateUserBadges(userId, action, badges) {
+            return fetch(`${API_BASE_URL}/admin/users/${userId}/badges`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ action, badges })
+            });
+        }
+
+        function parseBadgeInput(input) {
+            if (!input) {
+                return [];
+            }
+            return input
+                .split(',')
+                .map(item => item.trim().toLowerCase())
+                .filter(Boolean);
+        }
+
+        function initializeTheme() {
+            const storedTheme = localStorage.getItem(THEME_KEY);
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const shouldUseDark = storedTheme ? storedTheme === 'dark' : prefersDark;
+            document.body.classList.toggle('dark', shouldUseDark);
+            updateThemeToggle(shouldUseDark);
+            themeToggle.classList.remove('hidden');
+            themeToggle.addEventListener('click', () => {
+                const currentIsDark = document.body.classList.toggle('dark');
+                localStorage.setItem(THEME_KEY, currentIsDark ? 'dark' : 'light');
+                updateThemeToggle(currentIsDark);
+                lucide.createIcons();
+            });
+        }
+
+        function updateThemeToggle(isDark) {
+            themeToggleLabel.textContent = isDark ? 'Светлая тема' : 'Тёмная тема';
+            themeToggleIcon.setAttribute('data-lucide', isDark ? 'sun' : 'moon');
+            lucide.createIcons();
+        }
+
+        function formatDateTime(dateString) {
+            if (!dateString) {
+                return '—';
+            }
+            try {
+                const date = new Date(dateString);
+                return Intl.DateTimeFormat('ru-RU', {
+                    dateStyle: 'medium',
+                    timeStyle: 'short'
+                }).format(date);
+            } catch (error) {
+                return String(dateString);
+            }
+        }
+
+        function setRegistrationLoading(isLoading) {
+            registrationForm.classList.toggle('opacity-70', isLoading);
+            registrationForm.querySelectorAll('input, textarea, button').forEach(el => el.disabled = isLoading);
+            if (isLoading) {
+                registrationStatusLabel.textContent = 'Сохраняем настройки...';
+            }
+        }
+
+        async function loadRegistrationSettings() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/admin/settings/registration`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Не удалось получить настройки регистрации');
+                }
+
+                const settings = await response.json();
+                registrationFrozen.checked = Boolean(settings.frozen);
+                registrationMessage.value = settings.message || '';
+                registrationStatusLabel.textContent = settings.frozen ? 'Регистрация заморожена' : 'Регистрация открыта';
+                registrationUpdatedAt.textContent = `Обновлено: ${formatDateTime(settings.updatedAt || new Date())}`;
+                updateToggleVisual(registrationFrozen);
+            } catch (error) {
+                console.error('Load registration settings error:', error);
+                registrationStatusLabel.textContent = 'Не удалось загрузить настройки регистрации';
+            }
+        }
+
+        registrationForm.addEventListener('change', (event) => {
+            if (event.target === registrationFrozen) {
+                updateToggleVisual(registrationFrozen);
+            }
+        });
+
+        registrationForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            setRegistrationLoading(true);
+            try {
+                const response = await fetch(`${API_BASE_URL}/admin/settings/registration`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        frozen: registrationFrozen.checked,
+                        message: registrationMessage.value
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.message || 'Не удалось сохранить настройки регистрации');
+                }
+
+                registrationStatusLabel.textContent = data.settings?.frozen ? 'Регистрация заморожена' : 'Регистрация открыта';
+                registrationUpdatedAt.textContent = `Обновлено: ${formatDateTime(new Date())}`;
+                showToast('Настройки регистрации сохранены', 'success');
+            } catch (error) {
+                console.error('Save registration settings error:', error);
+                showToast(error.message || 'Не удалось сохранить настройки регистрации', 'error');
+            } finally {
+                setRegistrationLoading(false);
+            }
+        });
+
+        refreshRegistrationBtn.addEventListener('click', () => loadRegistrationSettings());
+
+        function updateToggleVisual(checkbox) {
+            const track = checkbox.closest('label')?.querySelector('.theme-toggle-track');
+            const thumb = checkbox.closest('label')?.querySelector('.theme-toggle-thumb');
+            if (checkbox.checked) {
+                track?.classList.add('bg-indigo-500/60');
+                thumb?.classList.add('translate-x-[20px]', 'bg-indigo-500');
+            } else {
+                track?.classList.remove('bg-indigo-500/60');
+                thumb?.classList.remove('translate-x-[20px]', 'bg-indigo-500');
+            }
+        }
+
+        async function loadProPlans() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/admin/pro-plans`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Не удалось получить тарифы PRO');
+                }
+
+                proPlans = await response.json();
+                renderProPlanCards();
+                renderProPlanOptions();
+            } catch (error) {
+                console.error('Load PRO plans error:', error);
+                proPlans = [];
+                proPlansList.innerHTML = `<div class="p-6 border border-dashed border-rose-200 rounded-2xl text-rose-400">${error.message || 'Не удалось загрузить тарифы PRO'}</div>`;
+                if (proPlanOptions) {
+                    proPlanOptions.innerHTML = '<div class="p-4 border border-dashed border-rose-200 rounded-2xl text-rose-400">Не удалось загрузить тарифы PRO</div>';
+                }
+            }
+        }
+
+        refreshProPlansBtn?.addEventListener('click', () => loadProPlans());
+
+        // Секция списка тарифов скрыта по требованию администратора
+        document.getElementById('proPlansSection')?.classList.add('hidden');
+
+        function renderProPlanCards() {
+            if (!proPlans.length) {
+                proPlansList.innerHTML = '<div class="p-6 border border-dashed border-gray-200 rounded-2xl text-gray-400">Тарифы не найдены</div>';
+                return;
+            }
+
+            proPlansList.innerHTML = proPlans.map(plan => {
+                const duration = plan.months ? `${plan.months} мес.` : 'Навсегда';
+                return `
+                    <div class="rounded-2xl border border-indigo-100 bg-white/90 p-5 shadow-sm flex flex-col gap-3">
+                        <div class="flex items-center gap-2 text-indigo-600 font-semibold">
+                            <i data-lucide="zap" class="w-4 h-4"></i>
+                            ${plan.label || plan.code}
+                        </div>
+                        <div class="text-sm text-gray-500">Код: <span class="font-mono text-gray-700">${plan.code}</span></div>
+                        <div class="text-sm text-gray-500">Длительность: ${duration}</div>
+                        <button class="mt-2 inline-flex items-center gap-2 text-sm font-semibold text-indigo-600 hover:text-indigo-500" data-plan-copy="${plan.code}">
+                            <i data-lucide="clipboard-copy" class="w-4 h-4"></i>
+                            Скопировать код
+                        </button>
+                    </div>
+                `;
+            }).join('');
+            lucide.createIcons();
+
+            proPlansList.querySelectorAll('[data-plan-copy]').forEach(button => {
+                button.addEventListener('click', () => {
+                    const planCode = button.getAttribute('data-plan-copy');
+                    if (planCode) {
+                        navigator.clipboard.writeText(planCode)
+                            .then(() => showToast(`Код тарифа ${planCode} скопирован`, 'success'))
+                            .catch(() => showToast('Не удалось скопировать код', 'error'));
+                    }
+                });
+            });
+        }
+
+        function renderProPlanOptions() {
+            if (!proPlanOptions) return;
+            if (!proPlanOptions) {
+                return;
+            }
+            if (!proPlans || !proPlans.length) {
+                proPlanOptions.innerHTML = '<div class="p-4 border border-dashed border-gray-200 rounded-2xl text-gray-400">Тарифы не найдены</div>';
+                return;
+            }
+            proPlanOptions.innerHTML = proPlans.map(plan => {
+                const id = `pro_${plan.code}`;
+                const durationLabel = plan.months ? `${plan.months} мес.` : (plan.days ? `${plan.days} дн.` : 'Навсегда');
+                return `
+                <label for="${id}" class="flex items-center gap-3 border border-gray-200 rounded-2xl p-4 cursor-pointer hover:border-indigo-200 transition">
+                    <input type="radio" id="${id}" name="proPlan" value="${plan.code}" class="sr-only peer">
+                    <span class="flex-1">
+                        <span class="block font-semibold text-gray-800">${plan.label || plan.code}</span>
+                        <span class="text-sm text-gray-500">${durationLabel}</span>
+                    </span>
+                </label>
+            `;}).join('');
+
+            // Добавляем визуальную подсветку выбранного тарифа
+            const updateAllStyles = ()=>{
+                proPlanOptions.querySelectorAll('input[name="proPlan"]').forEach((input)=>{
+                    const label = input.closest('label');
+                    if(!label) return;
+                    if(input.checked){
+                        label.classList.add('border-indigo-300','ring-2','ring-indigo-200');
+                    }else{
+                        label.classList.remove('border-indigo-300','ring-2','ring-indigo-200');
+                    }
+                });
+            };
+            // Если ничего не выбрано — выбрать первый тариф по умолчанию
+            const first = proPlanOptions.querySelector('input[name="proPlan"]');
+            if (first && !proPlanOptions.querySelector('input[name="proPlan"]:checked')) {
+                first.checked = true;
+            }
+            updateAllStyles();
+            proPlanOptions.addEventListener('change', updateAllStyles);
+        }
+
+        function openModal(modal) {
+            if (!modal) return;
+            modal.classList.remove('modal-hidden');
+            modal.classList.add('modal-visible');
+            document.body.classList.add('overflow-hidden');
+            lucide.createIcons();
+        }
+
+        function closeModal(modal) {
+            if (!modal) return;
+            modal.classList.remove('modal-visible');
+            modal.classList.add('modal-hidden');
+            document.body.classList.remove('overflow-hidden');
+        }
+
+        document.querySelectorAll('[data-modal-close="badge"]').forEach(btn => btn.addEventListener('click', () => closeModal(badgeModal)));
+        document.querySelectorAll('[data-modal-close="pro"]').forEach(btn => btn.addEventListener('click', () => closeModal(proModal)));
+
+        badgeModal.addEventListener('click', (event) => {
+            if (event.target === badgeModal) {
+                closeModal(badgeModal);
+            }
+        });
+
+        proModal.addEventListener('click', (event) => {
+            if (event.target === proModal) {
+                closeModal(proModal);
+            }
+        });
+
+        function renderBadgeOptions(selectedBadges = []) {
+            if (!badgeOptions) {
+                return;
+            }
+
+            if (!availableBadges.length) {
+                badgeOptions.innerHTML = '<div class="p-4 border border-dashed border-gray-200 rounded-2xl text-gray-400">Бейджи не найдены</div>';
+                return;
+            }
+
+            const selectedSet = new Set(selectedBadges.map(normalizeBadgeKey));
+            badgeOptions.innerHTML = availableBadges.map((badge) => {
+                const normalizedKey = normalizeBadgeKey(badge.key);
+                const isSelected = selectedSet.has(normalizedKey);
+                const icon = badge.icon || 'award';
+                return `
+                    <label class="badge-option">
+                        <input type="checkbox" value="${normalizedKey}" class="sr-only" ${isSelected ? 'checked' : ''}>
+                        <div class="badge-option__body flex items-center gap-3 border border-gray-200 dark:border-gray-700 rounded-2xl px-4 py-3 bg-white/70 dark:bg-gray-800/70 hover:border-indigo-200 dark:hover:border-indigo-500/40 transition">
+                            <i data-lucide="${icon}" class="w-4 h-4 text-indigo-500"></i>
+                            <div>
+                                <p class="font-semibold text-gray-800 dark:text-gray-100">${formatBadgeLabel(normalizedKey)}</p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400 font-mono">${normalizedKey}</p>
+                            </div>
+                        </div>
+                    </label>
+                `;
+            }).join('');
+            lucide.createIcons();
+            updateBadgeSelectedCount();
+        }
+
+        function updateBadgeSelectedCount() {
+            if (!badgeForm) {
+                return;
+            }
+            const selected = Array.from(badgeForm.querySelectorAll('input[type="checkbox"]:checked'));
+            badgeSelectedCount.textContent = selected.length ? `Выбрано бейджей: ${selected.length}` : 'Бейджи не выбраны';
+        }
+
+        badgeForm?.addEventListener('change', updateBadgeSelectedCount);
+
+        badgeAddCustomBtn?.addEventListener('click', () => {
+            const value = normalizeBadgeKey(badgeCustomInput.value);
+            if (!value) {
+                showToast('Введите корректный ключ бейджа', 'info');
+                return;
+            }
+            if (availableBadges.find(badge => normalizeBadgeKey(badge.key) === value)) {
+                showToast('Такой бейдж уже существует', 'info');
+                return;
+            }
+            availableBadges.push({ key: value, icon: 'award' });
+            renderBadgeOptions(Array.from(badgeForm.querySelectorAll('input[type="checkbox"]:checked')).map(input => input.value).concat(value));
+            badgeCustomInput.value = '';
+            showToast('Новый бейдж добавлен локально', 'success');
+        });
+
+        badgeForm?.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            if (!currentBadgeUser?.id) {
+                return;
+            }
+                        const checkedBadges = Array.from(badgeForm.querySelectorAll('input[type="checkbox"]:checked')).map(i=>i.value);
+            const current = (currentBadgeUser?.badges || []).map(normalizeBadgeKey);
+            const toGrant = checkedBadges.filter(b=>!current.includes(normalizeBadgeKey(b)));
+            const toRevoke = current.filter(b=>!checkedBadges.includes(normalizeBadgeKey(b)));
+
+            if (!toGrant.length && !toRevoke.length) {
+                showToast('Изменений нет', 'info');
+                return;
+            }
+
+            badgeForm.classList.add('opacity-70');
+            badgeForm.querySelectorAll('input, button').forEach(el => el.disabled = true);
+            try {
+                if (toGrant.length) {
+                    const r = await updateUserBadges(currentBadgeUser.id,'grant',toGrant);
+                    if(!r.ok){const d=await r.json();throw new Error(d.message||'Ошибка выдачи');}
+                }
+                if (toRevoke.length) {
+                    const r = await updateUserBadges(currentBadgeUser.id,'revoke',toRevoke);
+                    if(!r.ok){const d=await r.json();throw new Error(d.message||'Ошибка снятия');}
+                }
+                showToast('Бейджи обновлены', 'success');
+                closeModal(badgeModal);
+                loadUsers();
+                loadAvailableBadges();
+            } catch (error) {
+                console.error('Save badges error:', error);
+                showToast(error.message || 'Не удалось сохранить бейджи', 'error');
+            } finally {
+                badgeForm.classList.remove('opacity-70');
+                badgeForm.querySelectorAll('input, button').forEach(el => el.disabled = false);
+            }
+        });
+
+        async function populateBadgeModal(user) {
+            currentBadgeUser = user;
+            await loadAvailableBadges();
+            const selectedBadges = user.badges || [];
+            renderBadgeOptions(selectedBadges);
+            updateBadgeSelectedCount();
+        }
+
+        async function populateProModal(user) {
+            currentProUser = user;
+            await loadProPlans();
+            renderProPlanOptions();
+            updateProModal(user);
+        }
+
+        function updateProModal(user) {
+            if (!user) {
+                return;
+            }
+            const proState = user.pro || {};
+            const isPro = Boolean(proState.status);
+            proStatusCheckbox.checked = isPro;
+            updateToggleVisual(proStatusCheckbox);
+            proStatusLabel.textContent = isPro ? 'PRO активирован' : 'PRO не активен';
+            proPlanChooser.classList.toggle('hidden', !isPro);
+
+            const planInputs = proForm.querySelectorAll('input[name="proPlan"]');
+            if (planInputs.length) {
+                planInputs.forEach(input => {
+                    input.checked = input.value === (proState.plan || 'forever');
+                });
+                if (!Array.from(planInputs).some(input => input.checked)) {
+                    planInputs[0].checked = true;
+                }
+            }
+
+            const infoLines = [];
+            if (proState.startDate) {
+                infoLines.push(`<span>Начало: <strong>${formatDateTime(proState.startDate)}</strong></span>`);
+            }
+            if (proState.endDate) {
+                infoLines.push(`<span>Окончание: <strong>${formatDateTime(proState.endDate)}</strong></span>`);
+            }
+            if (proState.plan) {
+                infoLines.push(`<span>Тариф: <strong>${proState.plan}</strong></span>`);
+            }
+            proCurrentInfo.innerHTML = infoLines.join('<br>') || '<span class="text-gray-400">PRO ещё не активирован</span>';
+            proUpdatedAt.textContent = proState.updatedAt ? `Обновлено: ${formatDateTime(proState.updatedAt)}` : '';
+        }
+
+        proStatusCheckbox.addEventListener('change', () => {
+            proPlanChooser.classList.toggle('hidden', !proStatusCheckbox.checked);
+            updateToggleVisual(proStatusCheckbox);
+        });
+
+        proForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            if (!currentProUser?.id) {
+                return;
+            }
+
+            const isPro = proStatusCheckbox.checked;
+            const selectedPlanInput = proForm.querySelector('input[name="proPlan"]:checked');
+            const planCode = selectedPlanInput?.value || '1m';
+
+            proForm.classList.add('opacity-70');
+            proForm.querySelectorAll('input, button').forEach(el => el.disabled = true);
+
+            try {
+                let response, data;
+                if (!isPro) {
+                    // Полное отключение PRO
+                    response = await fetch(`${API_BASE_URL}/admin/users/${currentProUser.id}/pro/remove`, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    data = await response.json();
+                    if (!response.ok) throw new Error(data.message || 'Не удалось отключить PRO');
+                    showToast('PRO отключён', 'success');
+                } else {
+                    // Копилка: добавить срок к текущей подписке
+                    response = await fetch(`${API_BASE_URL}/admin/users/${currentProUser.id}/pro/add`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ plan: planCode })
+                    });
+                    data = await response.json();
+                    if (!response.ok) throw new Error(data.message || 'Не удалось продлить PRO');
+                    showToast('PRO продлён/установлен', 'success');
+                }
+                closeModal(proModal);
+                loadUsers();
+            } catch (error) {
+                console.error('Update PRO status error:', error);
+                showToast(error.message || 'Не удалось обновить PRO статус', 'error');
+            } finally {
+                proForm.classList.remove('opacity-70');
+                proForm.querySelectorAll('input, button').forEach(el => el.disabled = false);
+            }
+        });
+
+        publishUpdateForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            publishUpdateBtn.disabled = true;
+            publishUpdateBtn.classList.add('opacity-70');
+            publishUpdateStatus.textContent = 'Публикуем обновление...';
+
+            const apkFile = document.getElementById('apkFile').files[0];
+            let downloadUrl = '/apk/download'; // Default to server APK
+
+            try {
+                // Upload APK if file is selected
+                if (apkFile) {
+                    const formData = new FormData();
+                    formData.append('apk', apkFile);
+
+                    const apkProgress = document.getElementById('apkUploadProgress');
+                    const apkStatus = document.getElementById('apkUploadStatus');
+                    const apkPercent = document.getElementById('apkUploadPercent');
+                    const apkBar = document.getElementById('apkUploadBar');
+
+                    apkProgress.classList.remove('hidden');
+                    apkStatus.textContent = 'Загрузка APK...';
+
+                    const xhr = new XMLHttpRequest();
+                    
+                    xhr.upload.addEventListener('progress', (e) => {
+                        if (e.lengthComputable) {
+                            const percent = Math.round((e.loaded / e.total) * 100);
+                            apkPercent.textContent = `${percent}%`;
+                            apkBar.style.width = `${percent}%`;
+                        }
+                    });
+
+                    const uploadPromise = new Promise((resolve, reject) => {
+                        xhr.onload = () => {
+                            if (xhr.status >= 200 && xhr.status < 300) {
+                                try {
+                                    const data = JSON.parse(xhr.responseText);
+                                    resolve(data);
+                                } catch (e) {
+                                    reject(new Error('Ошибка парсинга ответа'));
+                                }
+                            } else {
+                                reject(new Error('Ошибка загрузки APK'));
+                            }
+                        };
+                        xhr.onerror = () => reject(new Error('Ошибка сети'));
+                    });
+
+                    xhr.open('POST', `${API_BASE_URL}/admin/upload-apk`);
+                    xhr.send(formData);
+
+                    const uploadResult = await uploadPromise;
+                    downloadUrl = uploadResult.downloadUrl;
+                    
+                    apkStatus.textContent = `Загружено: ${uploadResult.sizeMB} MB`;
+                    showToast('APK успешно загружен', 'success');
+                    
+                    setTimeout(() => apkProgress.classList.add('hidden'), 2000);
+                }
+
+                // Publish update info
+                const payload = {
+                    version: document.getElementById('updateVersion').value,
+                    title: document.getElementById('updateTitle').value,
+                    message: document.getElementById('updateMessage').value,
+                    downloadUrl: downloadUrl,
+                };
+
+                const response = await fetch(`${API_BASE_URL}/admin/publish-update`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.message || 'Не удалось опубликовать обновление');
+                }
+
+                publishUpdateStatus.textContent = `Опубликовано: ${formatDateTime(data.latestVersion?.publishedAt)}`;
+                showToast('Обновление опубликовано', 'success');
+                loadLatestUpdate();
+                publishUpdateForm.reset();
+            } catch (error) {
+                console.error('Publish update error:', error);
+                publishUpdateStatus.textContent = 'Ошибка публикации';
+                showToast(error.message || 'Не удалось опубликовать обновление', 'error');
+            } finally {
+                publishUpdateBtn.disabled = false;
+                publishUpdateBtn.classList.remove('opacity-70');
+                setTimeout(() => publishUpdateStatus.textContent = '', 4000);
+            }
+        });
+
+        async function loadLatestUpdate() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/health`);
+                if (!response.ok) {
+                    throw new Error('Не удалось получить информацию о последнем обновлении');
+                }
+                const data = await response.json();
+                if (data.latestVersion) {
+                    latestUpdateInfo.innerHTML = `
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="history" class="w-4 h-4"></i>
+                            <span>Последняя версия: <strong>${data.latestVersion.version}</strong> от ${formatDateTime(data.latestVersion.publishedAt)}</span>
+                        </div>
+                    `;
+                } else {
+                    latestUpdateInfo.innerHTML = '<span class="text-sm text-gray-400">Ещё нет опубликованных обновлений</span>';
+                }
+                lucide.createIcons();
+            } catch (error) {
+                console.error('Load latest update error:', error);
+                latestUpdateInfo.innerHTML = '<span class="text-sm text-rose-400">Не удалось загрузить данные об обновлении</span>';
+            }
+        }
+
+        function showAdminPanel() {
+            loginForm.classList.add('hidden');
+            adminPanel.classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function showLoginPanel() {
+            adminPanel.classList.add('hidden');
+            loginForm.classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        // === Gemini Key Logic ===
+        function setGeminiStatus(text) {
+            if (geminiKeyStatus) geminiKeyStatus.textContent = text;
+        }
+
+        async function loadGeminiKeyStatus() {
+            try {
+                const res = await fetch(`${API_BASE_URL}/admin/ai/gemini-key`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message || 'Не удалось получить статус ключа');
+                if (data.configured) {
+                    const updated = data.updatedAt ? new Date(data.updatedAt).toLocaleString() : '';
+                    setGeminiStatus(`Статус: настроен (…${data.last4 || '****'}) • ${updated}`);
+                } else {
+                    setGeminiStatus('Статус: не загружен');
+                }
+            } catch (e) {
+                console.error('loadGeminiKeyStatus error', e);
+                setGeminiStatus('Статус: ошибка загрузки');
+            }
+        }
+
+        geminiKeyReveal?.addEventListener('click', () => {
+            if (!geminiKeyInput) return;
+            const isPassword = geminiKeyInput.type === 'password';
+            geminiKeyInput.type = isPassword ? 'text' : 'password';
+            geminiKeyReveal.innerHTML = isPassword
+                ? '<i data-lucide="eye-off" class="w-5 h-5"></i>'
+                : '<i data-lucide="eye" class="w-5 h-5"></i>';
+            lucide.createIcons();
+        });
+
+        geminiKeyForm?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const apiKey = (geminiKeyInput?.value || '').trim();
+            if (!apiKey || apiKey.length < 10) {
+                showToast('Введите корректный ключ Gemini', 'error');
+                return;
+            }
+            try {
+                geminiKeySaveBtn.disabled = true;
+                geminiKeySaveBtn.classList.add('opacity-70','cursor-not-allowed');
+                const res = await fetch(`${API_BASE_URL}/admin/ai/gemini-key`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ apiKey })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message || 'Не удалось сохранить ключ');
+                geminiKeyInput.value = '';
+                await loadGeminiKeyStatus();
+                showToast('Ключ Gemini сохранён', 'success');
+            } catch (error) {
+                console.error('Save Gemini key error', error);
+                showToast(error.message || 'Ошибка сохранения ключа', 'error');
+            } finally {
+                geminiKeySaveBtn.disabled = false;
+                geminiKeySaveBtn.classList.remove('opacity-70','cursor-not-allowed');
+            }
+        });
+
+        async function loadUsers() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/admin/users`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load users');
+                }
+
+                const users = await response.json();
+                usersList.innerHTML = '';
+                usersCount.textContent = `${users.length} ${declension(users.length, ['пользователь', 'пользователя', 'пользователей'])}`;
+
+                users.forEach(user => {
+                    const userCard = document.createElement('div');
+                    userCard.className = 'border border-gray-100 rounded-2xl p-5 bg-white/90 shadow-sm hover:shadow-md transition flex flex-col md:flex-row md:items-center md:justify-between gap-4';
+                    userCard.setAttribute('data-id', user.id);
+                    userCard.setAttribute('data-email', user.email);
+                    userCard.setAttribute('data-name', user.name);
+                    userCard.setAttribute('data-badges', (user.badges || []).join(','));
+                    userCard.setAttribute('data-user-card', 'true');
+
+                    const badgeMarkup = (user.badges || []).map(badge => `
+                        <span class="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full bg-sky-100 text-sky-600">
+                            <i data-lucide="medal" class="w-3.5 h-3.5"></i>
+                            ${formatBadgeLabel(badge)}
+                        </span>
+                    `).join('');
+                    const badgeSection = badgeMarkup || '<span class="text-xs text-gray-400">Бейджи отсутствуют</span>';
+
+                    userCard.innerHTML = `
+                        <div class="flex-1">
+                            <div class="flex items-center gap-3">
+                                <div class="w-12 h-12 rounded-full bg-indigo-500/10 text-indigo-500 flex items-center justify-center font-semibold">
+                                    ${getInitials(user.name || user.email)}
+                                </div>
+                                <div>
+                                    <h3 class="text-lg font-semibold text-gray-900">${escapeHtml(user.name || 'Без имени')}</h3>
+                                    <p class="text-sm text-gray-500">${escapeHtml(user.email)}</p>
+                                </div>
+                            </div>
+                            <div class="mt-3 flex flex-wrap items-center gap-3 text-sm text-gray-500">
+                                <span class="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 rounded-full">
+                                    <strong>ID:</strong> ${user.id}
+                                </span>
+                                <span class="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 rounded-full">
+                                    <strong>UID:</strong> ${user.uid || '—'}
+                                </span>
+                                <span class="inline-flex items-center gap-1 px-2 py-1 ${user.pro?.status ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-100 text-gray-500'} rounded-full">
+                                    <i data-lucide="zap" class="w-4 h-4"></i>
+                                    ${user.pro?.status ? 'PRO аккаунт' : 'Бесплатный аккаунт'}
+                                </span>
+                                ${badgeSection}
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2 justify-end">
+                            <button class="px-4 py-2 rounded-xl border border-indigo-100 text-indigo-600 hover:bg-indigo-50 transition text-sm font-semibold"
+                                data-action="toggle-pro" data-id="${user.id}" data-status="${!user.pro?.status}">
+                                ${user.pro?.status ? 'Снять PRO' : 'Выдать PRO'}
+                            </button>
+                            <button class="px-4 py-2 rounded-xl border border-sky-100 text-sky-600 hover:bg-sky-50 transition text-sm font-semibold"
+                                data-action="edit-badges" data-id="${user.id}">
+                                Бейджи
+                            </button>
+                            <button class="px-4 py-2 rounded-xl border border-rose-100 text-rose-600 hover:bg-rose-50 transition text-sm font-semibold"
+                                data-action="delete-user" data-id="${user.id}" data-name="${escapeHtml(user.name || user.email)}">
+                                Удалить
+                            </button>
+                        </div>
+                    `;
+
+                    usersList.appendChild(userCard);
+                });
+
+                lucide.createIcons();
+            } catch (error) {
+                console.error('Load users error:', error);
+                usersList.innerHTML = '<div class="p-6 border border-red-100 bg-red-50 rounded-2xl text-red-500">Не удалось загрузить пользователей</div>';
+            }
+        }
+
+        usersList.addEventListener('click', async (event) => {
+            const button = event.target.closest('[data-action]');
+            if (!button) {
+                return;
+            }
+
+            const action = button.getAttribute('data-action');
+            const userId = button.getAttribute('data-id');
+            const userCard = button.closest('[data-user-card="true"]');
+
+            const findUserByIdFromCard = async (card) => {
+                const uid = card?.getAttribute('data-id');
+                if (!uid) return null;
+                try {
+                    const users = await fetch(`${API_BASE_URL}/admin/users`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    }).then(r=>r.json());
+                    return users.find(u=>String(u.id)===String(uid));
+                } catch {return null;}
+            };
+
+            const setLoading = (state) => {
+                button.disabled = state;
+                button.classList.toggle('opacity-70', state);
+            };
+
+            try {
+                if (action === 'toggle-pro') {
+                    // Открываем модальное окно управления PRO
+                    const user = await findUserByIdFromCard(userCard);
+                    if (!user) return;
+                    await populateProModal(user);
+                    openModal(proModal);
+                    return;
+                } else if (action === 'edit-badges') {
+                    // Открываем модальное окно выбора бейджей
+                    const user = await findUserByIdFromCard(userCard);
+                    if (!user) return;
+                    await populateBadgeModal(user);
+                    openModal(badgeModal);
+                    return;
+                } else if (action === 'revoke-badge_unused') {
+                    const currentBadges = (userCard?.getAttribute('data-badges') || '').split(',').map(b => b.trim()).filter(Boolean);
+                    if (!currentBadges.length) {
+                        showToast('У пользователя нет бейджей для удаления', 'info');
+                        return;
+                    }
+
+                    const hint = `Текущие бейджи: ${currentBadges.join(', ')}`;
+                    const input = prompt(`Укажите бейджи для снятия через запятую. ${hint}`);
+                    const badges = parseBadgeInput(input).filter(badge => currentBadges.includes(badge));
+
+                    if (!badges.length) {
+                        showToast('Не выбрано ни одного существующего бейджа', 'info');
+                        return;
+                    }
+
+                    setLoading(true);
+                    const response = await updateUserBadges(userId, 'revoke', badges);
+                    if (response.ok) {
+                        showToast('Бейджи сняты', 'success');
+                        loadUsers();
+                    } else {
+                        const data = await response.json();
+                        showToast(data.message || 'Не удалось снять бейджи', 'error');
+                    }
+                } else if (action === 'delete-user') {
+                    const userName = button.getAttribute('data-name') || `ID ${userId}`;
+                    if (!confirm(`Удалить пользователя «${userName}» без возможности восстановления?`)) {
+                        return;
+                    }
+
+                    setLoading(true);
+                    const response = await fetch(`${API_BASE_URL}/admin/users/${userId}`, {
+                        method: 'DELETE',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+
+                    const data = await response.json();
+                    if (response.ok) {
+                        showToast(data.message || 'Пользователь удалён', 'success');
+                        loadUsers();
+                        loadAvailableBadges();
+                    } else {
+                        showToast(data.message || 'Не удалось удалить пользователя', 'error');
+                    }
+                }
+            } catch (error) {
+                console.error('Admin action error:', error);
+                showToast('Произошла ошибка при выполнении действия', 'error');
+            } finally {
+                setLoading(false);
+            }
+        });
+
+        async function loadServerStatus() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/health`);
+                const status = await response.json();
+
+                serverStatus.innerHTML = `
+                    <div class="space-y-2 text-sm">
+                        <p class="flex items-center gap-2">
+                            <i data-lucide="activity" class="w-4 h-4 text-emerald-500"></i>
+                            <span><strong>Статус:</strong> <span class="text-emerald-500">${status.status}</span></span>
+                        </p>
+                        <p><strong>Текущая версия:</strong> ${status.currentVersion}</p>
+                        <p><strong>Последняя версия:</strong> ${status.latestVersion?.version || '—'}</p>
+                        <p><strong>Аптайм:</strong> ${status.uptime ? Math.floor(status.uptime / 60) + ' мин.' : '—'}</p>
+                    </div>
+                `;
+                lucide.createIcons();
+            } catch (error) {
+                console.error('Load status error:', error);
+                serverStatus.innerHTML = '<div class="text-red-500 text-sm">Не удалось загрузить статус сервера</div>';
+            }
+        }
+
+        function declension(number, titles) {
+            const cases = [2, 0, 1, 1, 1, 2];
+            return titles[(number % 100 > 4 && number % 100 < 20) ? 2 : cases[(number % 10 < 5) ? number % 10 : 5]];
+        }
+
+        function getInitials(name) {
+            if (!name) return 'AI';
+            return name.split(' ').slice(0, 2).map(part => part.charAt(0).toUpperCase()).join('') || 'AI';
+        }
+
+        // Normalize badge key helper used across badge UI
+        function normalizeBadgeKey(key) {
+            return String(key || '').trim().toLowerCase();
+        }
+
+        function formatBadgeLabel(badge) {
+            if (!badge) {
+                return '';
+            }
+            return badge.charAt(0).toUpperCase() + badge.slice(1);
+        }
+
+        function escapeHtml(value) {
+            return value?.replace(/[&<>"']/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'': '&#39;'}[char] || char)) || '';
+        }
+
+        function showToast(message, type = 'info') {
+            let container = document.getElementById('toast-container');
+            if (!container) {
+                container = document.createElement('div');
+                container.id = 'toast-container';
+                container.className = 'fixed top-6 right-6 space-y-3 z-50';
+                document.body.appendChild(container);
+            }
+
+            const typeClasses = {
+                success: 'bg-emerald-500',
+                error: 'bg-rose-500',
+                info: 'bg-indigo-500'
+            };
+
+            const toast = document.createElement('div');
+            toast.className = `${typeClasses[type] || typeClasses.info} text-white px-4 py-3 rounded-2xl shadow-lg shadow-black/10 flex items-center gap-3 animate-fade-in`;
+            toast.innerHTML = `
+                <i data-lucide="bell" class="w-4 h-4"></i>
+                <span class="text-sm font-semibold">${message}</span>
+            `;
+
+            container.appendChild(toast);
+            lucide.createIcons();
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 2600);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+        });
+    </script>
+</body>
+</html>
