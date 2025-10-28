@@ -3793,6 +3793,7 @@ app.post('/planner/generate/:userId', async (req, res) => {
 
     const weekStart = getMonday();
     const today = startOfDay();
+    console.log(`[PLANNER] Today (startOfDay): ${today.toISOString()}`);
     const tasks = [];
     let taskDayOffset = 0; // Start from today
 
@@ -3800,6 +3801,7 @@ app.post('/planner/generate/:userId', async (req, res) => {
     recentEntries.filter(e => e.type === 'lecture').slice(0, 3).forEach((lecture, idx) => {
       const reviewDate = new Date(today);
       reviewDate.setDate(reviewDate.getDate() + taskDayOffset);
+      console.log(`[PLANNER] Creating lecture task for ${reviewDate.toISOString()} (offset: ${taskDayOffset})`);
       taskDayOffset++; // Next task on next day
 
       tasks.push({
@@ -3817,6 +3819,7 @@ app.post('/planner/generate/:userId', async (req, res) => {
     recentEntries.filter(e => e.type === 'scan').slice(0, 2).forEach((scan, idx) => {
       const reviewDate = new Date(today);
       reviewDate.setDate(reviewDate.getDate() + taskDayOffset);
+      console.log(`[PLANNER] Creating scan task for ${reviewDate.toISOString()} (offset: ${taskDayOffset})`);
       taskDayOffset++; // Next task on next day
 
       tasks.push({
