@@ -3774,7 +3774,7 @@ app.post('/planner/generate/:userId', async (req, res) => {
       return res.status(400).json({ message: 'Некорректный ID пользователя' });
     }
 
-    const user = await findUserById(userId);
+    const user = await User.findOne({ id: userId });
     if (!user) {
       return res.status(404).json({ message: 'Пользователь не найден' });
     }
