@@ -790,6 +790,7 @@ const notebookEntrySchema = new mongoose.Schema({
   }],
   attachments: { type: [String], default: [] },
   isPinned: { type: Boolean, default: false },
+  imageUrl: { type: String }, // URL изображения для конспектов (scan)
 }, { versionKey: false });
 
 // Schema for AI Lectures (from voice recordings)
@@ -3492,11 +3493,22 @@ app.get('/notebook/:userId', async (req, res) => {
       .skip(parseInt(skip))
       .lean();
 
+    // Добавляем imageUrl для конспектов (scan)
+    const enrichedEntries = await Promise.all(entries.map(async (entry) => {
+      if (entry.type === 'scan' && entry.linkedResourceId) {
+        const scan = await AiScanNote.findOne({ id: entry.linkedResourceId }).lean();
+        if (scan && scan.imageUrl) {
+          entry.imageUrl = scan.imageUrl;
+        }
+      }
+      return entry;
+    }));
+
     const total = await NotebookEntry.countDocuments(query);
 
     res.status(200).json({ 
       success: true, 
-      data: entries,
+      data: enrichedEntries,
       pagination: { total, limit: parseInt(limit), skip: parseInt(skip) }
     });
   } catch (error) {
