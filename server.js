@@ -3779,75 +3779,218 @@ app.post('/planner/generate/:userId', async (req, res) => {
       return res.status(404).json({ message: 'Пользователь не найден' });
     }
 
+    const apiKey = user.geminiApiKey || DEFAULT_GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.status(400).json({ message: 'API ключ Gemini не найден' });
+    }
+
     // Get recent notebook entries
     const recentEntries = await NotebookEntry.find({ userId })
       .sort({ createdAt: -1 })
-      .limit(10)
+      .limit(15)
       .lean();
 
     // Get recent quiz results to find weak areas
     const recentQuizzes = await QuizResult.find({ userId })
       .sort({ createdAt: -1 })
-      .limit(5)
+      .limit(10)
       .lean();
 
-    const weekStart = getMonday();
+    // Get study stats for context
+    const statsEndDate = startOfDay();
+    const statsStartDate = new Date(statsEndDate);
+    statsStartDate.setDate(statsStartDate.getDate() - 7);
+    
+    const recentStats = await StudyStatsDaily.find({
+      userId,
+      date: { $gte: statsStartDate, $lte: statsEndDate }
+    }).lean();
+
+    const totalStudyMinutes = recentStats.reduce((sum, stat) => sum + (stat.studyMinutes || 0), 0);
+    const avgStudyMinutes = Math.round(totalStudyMinutes / 7);
+
+    // Prepare context for AI
+    const lecturesContext = recentEntries
+      .filter(e => e.type === 'lecture')
+      .slice(0, 5)
+      .map(l => `- "${l.title}" (${new Date(l.createdAt).toLocaleDateString('ru')})${l.tags ? `, теги: ${l.tags.join(', ')}` : ''}`)
+      .join('\n');
+
+    const scansContext = recentEntries
+      .filter(e => e.type === 'scan')
+      .slice(0, 5)
+      .map(s => `- "${s.title}" (${new Date(s.createdAt).toLocaleDateString('ru')})`)
+      .join('\n');
+
+    const weakQuizzes = recentQuizzes
+      .filter(q => q.score < 70)
+      .slice(0, 5)
+      .map(q => `- "${q.setTitle}": ${q.score}% (${q.correctAnswers}/${q.totalQuestions})`)
+      .join('\n');
+
+    const strongQuizzes = recentQuizzes
+      .filter(q => q.score >= 70)
+      .slice(0, 3)
+      .map(q => `- "${q.setTitle}": ${q.score}%`)
+      .join('\n');
+
     const today = startOfDay();
-    console.log(`[PLANNER] Today (startOfDay): ${today.toISOString()}`);
-    const tasks = [];
-    let taskDayOffset = 0; // Start from today
+    const weekStart = getMonday();
 
-    // Create review tasks for recent lectures (spaced repetition)
-    recentEntries.filter(e => e.type === 'lecture').slice(0, 3).forEach((lecture, idx) => {
-      const reviewDate = new Date(today);
-      reviewDate.setDate(reviewDate.getDate() + taskDayOffset);
-      console.log(`[PLANNER] Creating lecture task for ${reviewDate.toISOString()} (offset: ${taskDayOffset})`);
-      taskDayOffset++; // Next task on next day
+    const prompt = `Ты - AI-ассистент для создания персонализированного плана обучения. Проанализируй активность студента и создай оптимальный план повторения материала на неделю.
 
-      tasks.push({
-        id: generateEntryId(),
-        date: reviewDate,
-        title: `Повторить: ${lecture.title}`,
-        type: 'review_lecture',
-        relatedNotebookId: lecture.id,
-        completed: false,
-        priority: 'medium',
+**КОНТЕКСТ СТУДЕНТА:**
+
+Средняя учеба в день за последнюю неделю: ${avgStudyMinutes} минут
+
+Последние записанные лекции:
+${lecturesContext || 'Нет записей'}
+
+Последние отсканированные материалы:
+${scansContext || 'Нет сканов'}
+
+Квизы с низкими результатами (требуют повторения):
+${weakQuizzes || 'Нет слабых результатов'}
+
+Квизы с хорошими результатами:
+${strongQuizzes || 'Нет хороших результатов'}
+
+**ЗАДАЧА:**
+Создай план обучения на 7 дней начиная с сегодня (${today.toLocaleDateString('ru')}). 
+Используй принципы интервального повторения (spaced repetition):
+- День 1: повторить материал с низкими результатами
+- День 2-3: повторить недавние лекции
+- День 4-5: повторить отсканированные материалы
+- День 6-7: итоговое повторение сложных тем
+
+**ВАЖНО:**
+- Создай 5-8 конкретных задач
+- Распределяй задачи по разным дням (не все на один день!)
+- Приоритет: high (срочно), medium (обычно), low (желательно)
+- Тип задачи: review_lecture, review_scan, quiz, reading, custom
+- Используй конкретные названия материалов из контекста
+
+**ФОРМАТ ОТВЕТА (СТРОГО JSON):**
+{
+  "tasks": [
+    {
+      "dayOffset": 0,
+      "title": "Повторить: [название материала]",
+      "type": "review_lecture",
+      "priority": "high",
+      "relatedId": "[id материала если есть]"
+    }
+  ]
+}
+
+dayOffset - это количество дней от сегодня (0 = сегодня, 1 = завтра, и т.д.)`;
+
+    console.log('[PLANNER][AI] Calling Gemini for smart plan generation...');
+    
+    const payload = {
+      contents: [{
+        parts: [{ text: prompt }]
+      }],
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 2000,
+      }
+    };
+
+    const geminiResult = await callGemini(apiKey, payload);
+    const { parsed } = parseGeminiJson(geminiResult);
+
+    console.log('[PLANNER][AI] Gemini response:', JSON.stringify(parsed).slice(0, 300));
+
+    let tasks = [];
+
+    if (parsed && parsed.tasks && Array.isArray(parsed.tasks)) {
+      // Use AI generated tasks
+      tasks = parsed.tasks.map(aiTask => {
+        const reviewDate = new Date(today);
+        reviewDate.setDate(reviewDate.getDate() + (aiTask.dayOffset || 0));
+
+        // Find related entry if exists
+        let relatedNotebookId = null;
+        if (aiTask.type === 'review_lecture') {
+          const lecture = recentEntries.find(e => 
+            e.type === 'lecture' && aiTask.title.toLowerCase().includes(e.title.toLowerCase())
+          );
+          relatedNotebookId = lecture?.id;
+        } else if (aiTask.type === 'review_scan') {
+          const scan = recentEntries.find(e => 
+            e.type === 'scan' && aiTask.title.toLowerCase().includes(e.title.toLowerCase())
+          );
+          relatedNotebookId = scan?.id;
+        }
+
+        return {
+          id: generateEntryId(),
+          date: reviewDate,
+          title: aiTask.title,
+          type: aiTask.type || 'custom',
+          relatedNotebookId,
+          completed: false,
+          priority: aiTask.priority || 'medium',
+        };
       });
-    });
 
-    // Create review tasks for scans
-    recentEntries.filter(e => e.type === 'scan').slice(0, 2).forEach((scan, idx) => {
-      const reviewDate = new Date(today);
-      reviewDate.setDate(reviewDate.getDate() + taskDayOffset);
-      console.log(`[PLANNER] Creating scan task for ${reviewDate.toISOString()} (offset: ${taskDayOffset})`);
-      taskDayOffset++; // Next task on next day
+      console.log(`[PLANNER][AI] Generated ${tasks.length} AI-powered tasks`);
+    } else {
+      // Fallback to rule-based generation
+      console.log('[PLANNER][AI] Falling back to rule-based generation');
+      let taskDayOffset = 0;
 
-      tasks.push({
-        id: generateEntryId(),
-        date: reviewDate,
-        title: `Просмотреть: ${scan.title}`,
-        type: 'review_scan',
-        relatedNotebookId: scan.id,
-        completed: false,
-        priority: 'low',
+      // High priority: weak quizzes
+      recentQuizzes.filter(q => q.score < 70).slice(0, 2).forEach((quiz) => {
+        const reviewDate = new Date(today);
+        reviewDate.setDate(reviewDate.getDate() + taskDayOffset);
+        taskDayOffset++;
+
+        tasks.push({
+          id: generateEntryId(),
+          date: reviewDate,
+          title: `Повторить квиз: ${quiz.setTitle}`,
+          type: 'quiz',
+          completed: false,
+          priority: 'high',
+        });
       });
-    });
 
-    // Add quiz tasks for sets with poor performance
-    recentQuizzes.filter(q => q.score < 70).slice(0, 2).forEach((quiz, idx) => {
-      const reviewDate = new Date(today);
-      reviewDate.setDate(reviewDate.getDate() + taskDayOffset);
-      taskDayOffset++; // Next task on next day
+      // Medium priority: recent lectures
+      recentEntries.filter(e => e.type === 'lecture').slice(0, 3).forEach((lecture) => {
+        const reviewDate = new Date(today);
+        reviewDate.setDate(reviewDate.getDate() + taskDayOffset);
+        taskDayOffset++;
 
-      tasks.push({
-        id: generateEntryId(),
-        date: reviewDate,
-        title: `Повторить квиз: ${quiz.setTitle}`,
-        type: 'quiz',
-        completed: false,
-        priority: 'high',
+        tasks.push({
+          id: generateEntryId(),
+          date: reviewDate,
+          title: `Повторить: ${lecture.title}`,
+          type: 'review_lecture',
+          relatedNotebookId: lecture.id,
+          completed: false,
+          priority: 'medium',
+        });
       });
-    });
+
+      // Low priority: scans
+      recentEntries.filter(e => e.type === 'scan').slice(0, 2).forEach((scan) => {
+        const reviewDate = new Date(today);
+        reviewDate.setDate(reviewDate.getDate() + taskDayOffset);
+        taskDayOffset++;
+
+        tasks.push({
+          id: generateEntryId(),
+          date: reviewDate,
+          title: `Просмотреть: ${scan.title}`,
+          type: 'review_scan',
+          relatedNotebookId: scan.id,
+          completed: false,
+          priority: 'low',
+        });
+      });
+    }
 
     // Save planner
     const planner = await PlannerSchedule.findOneAndUpdate(
