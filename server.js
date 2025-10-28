@@ -3333,28 +3333,28 @@ app.get('/quiz-results/history/:userId', async (req, res) => {
 async function updateStats(userId, updates) {
   const today = startOfDay();
   
-  const updateFields = {};
-  if (updates.studyMinutes) updateFields.studyMinutes = updates.studyMinutes;
-  if (updates.scansCount) updateFields.$inc = { ...updateFields.$inc, scansCount: updates.scansCount };
-  if (updates.recordingsCount) updateFields.$inc = { ...updateFields.$inc, recordingsCount: updates.recordingsCount };
-  if (updates.chatSessionsCount) updateFields.$inc = { ...updateFields.$inc, chatSessionsCount: updates.chatSessionsCount };
-  if (updates.cardsCreated) updateFields.$inc = { ...updateFields.$inc, cardsCreated: updates.cardsCreated };
-  if (updates.quizzesTaken) updateFields.$inc = { ...updateFields.$inc, quizzesTaken: updates.quizzesTaken };
+  const incFields = {};
+  
+  // All stats should be incremented, not replaced
+  if (updates.studyMinutes) incFields.studyMinutes = updates.studyMinutes;
+  if (updates.scansCount) incFields.scansCount = updates.scansCount;
+  if (updates.recordingsCount) incFields.recordingsCount = updates.recordingsCount;
+  if (updates.chatSessionsCount) incFields.chatSessionsCount = updates.chatSessionsCount;
+  if (updates.cardsCreated) incFields.cardsCreated = updates.cardsCreated;
+  if (updates.quizzesTaken) incFields.quizzesTaken = updates.quizzesTaken;
 
-  if (Object.keys(updateFields).length === 0) return;
-
-  const incFields = updateFields.$inc || {};
-  delete updateFields.$inc;
+  if (Object.keys(incFields).length === 0) return;
 
   await StudyStatsDaily.findOneAndUpdate(
     { userId, date: today },
     {
-      ...updateFields,
       $inc: incFields,
       $set: { updatedAt: new Date() }
     },
     { upsert: true, new: true }
   );
+  
+  console.log(`[STATS] Updated stats for user ${userId}:`, incFields);
 }
 
 // Report activity
@@ -3375,6 +3375,7 @@ app.post('/stats/report', async (req, res) => {
     if (type === 'scan') updates.scansCount = 1;
     if (type === 'recording') updates.recordingsCount = 1;
     if (type === 'chat') updates.chatSessionsCount = 1;
+    if (type === 'quiz') updates.quizzesTaken = 1;
     if (minutes) updates.studyMinutes = minutes;
 
     await updateStats(userId, updates);
