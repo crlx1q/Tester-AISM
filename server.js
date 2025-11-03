@@ -2046,7 +2046,112 @@ app.delete('/recordings/:userId/:recordingId', async (req, res) => {
 });
 
 // === Achievements Management ===
+
+// Получить все достижения пользователя
 app.get('/achievements/:userId', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId, 10);
+    if (!Number.isFinite(userId)) {
+      return res.status(400).json({ message: 'Некорректный ID пользователя' });
+    }
+    
+    const achievements = await Achievement.find({ userId }).sort({ completedAt: -1, createdAt: -1 }).lean();
+    res.status(200).json({ success: true, data: achievements });
+  } catch (error) {
+    console.error('[ACHIEVEMENTS][ERROR] get', error);
+    res.status(500).json({ message: 'Не удалось получить достижения' });
+  }
+});
+
+// Сохранить/обновить достижение пользователя
+app.post('/achievements', async (req, res) => {
+  try {
+    const { userId, achievementId, type, name, description, icon, color, isUnlocked, unlockedAt } = req.body;
+    
+    if (!userId || !achievementId || !type || !name) {
+      return res.status(400).json({ message: 'Отсутствуют обязательные поля' });
+    }
+    
+    const user = await findUserById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'Пользователь не найден' });
+    }
+    
+    const achievementData = {
+      id: `${achievementId}_${userId}`,
+      userId,
+      type,
+      name,
+      description: description || '',
+      icon: icon || 'award',
+      progress: isUnlocked ? 100 : 0,
+      maxProgress: 100,
+      completed: isUnlocked || false,
+      completedAt: unlockedAt ? new Date(unlockedAt) : (isUnlocked ? new Date() : null),
+      createdAt: new Date(),
+    };
+    
+    const achievement = await Achievement.findOneAndUpdate(
+      { id: `${achievementId}_${userId}` },
+      achievementData,
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+    
+    console.log(`[ACHIEVEMENTS] Saved achievement ${achievementId} for user ${userId}, unlocked: ${isUnlocked}`);
+    res.status(200).json({ success: true, data: achievement });
+  } catch (error) {
+    console.error('[ACHIEVEMENTS][ERROR] post', error);
+    res.status(500).json({ message: 'Не удалось сохранить достижение' });
+  }
+});
+
+// Массовое сохранение достижений
+app.post('/achievements/batch', async (req, res) => {
+  try {
+    const { userId, achievements } = req.body;
+    
+    if (!userId || !Array.isArray(achievements)) {
+      return res.status(400).json({ message: 'Отсутствуют обязательные поля' });
+    }
+    
+    const user = await findUserById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'Пользователь не найден' });
+    }
+    
+    const saved = [];
+    for (const ach of achievements) {
+      const achievementData = {
+        id: `${ach.id}_${userId}`,
+        userId,
+        type: ach.type,
+        name: ach.name,
+        description: ach.description || '',
+        icon: ach.icon || 'award',
+        progress: ach.isUnlocked ? 100 : 0,
+        maxProgress: 100,
+        completed: ach.isUnlocked || false,
+        completedAt: ach.unlockedAt ? new Date(ach.unlockedAt) : (ach.isUnlocked ? new Date() : null),
+      };
+      
+      const achievement = await Achievement.findOneAndUpdate(
+        { id: `${ach.id}_${userId}` },
+        achievementData,
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
+      saved.push(achievement);
+    }
+    
+    console.log(`[ACHIEVEMENTS] Saved ${saved.length} achievements for user ${userId}`);
+    res.status(200).json({ success: true, data: saved });
+  } catch (error) {
+    console.error('[ACHIEVEMENTS][ERROR] batch', error);
+    res.status(500).json({ message: 'Не удалось сохранить достижения' });
+  }
+});
+
+// Legacy achievements code (для обратной совместимости)
+app.get('/achievements/legacy/:userId', async (req, res) => {
   try {
     const userId = parseInt(req.params.userId, 10);
     const achievements = await Achievement.find({ userId }).sort({ createdAt: -1 }).lean();
