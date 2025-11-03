@@ -4484,12 +4484,24 @@ app.post('/ai/lectures/:lectureId/cards', async (req, res) => {
       }
 
       const content = lecture.transcription || lecture.summary;
-      const prompt = `На основе этого текста лекции создай 5-7 учебных карточек (flashcards).
+      const difficulty = req.body.difficulty || 'medium'; // easy, medium, hard
+      const difficultyText = difficulty === 'easy' ? 'легкие' : difficulty === 'hard' ? 'сложные' : 'средние';
+      
+      const prompt = `На основе этого текста лекции создай 5-7 учебных карточек (flashcards) ${difficultyText} уровня сложности.
       
 Текст: ${content.substring(0, 3000)}
 
 Верни ТОЛЬКО JSON массив в формате:
-[{"term": "Вопрос или термин", "definition": "Ответ или определение"}, ...]`;
+[{
+  "term": "Вопрос или термин",
+  "definition": "Правильный ответ или определение",
+  "distractors": ["Неправильный вариант 1", "Неправильный вариант 2", "Неправильный вариант 3"]
+}, ...]
+
+ВАЖНО: 
+- Для каждой карточки создай ровно 3 неправильных, но схожих варианта ответов (дистракторы)
+- Дистракторы должны быть правдоподобными и логически связанными с темой
+- Они должны быть на том же уровне сложности, что указан выше`;
 
       try {
         const aiResponse = await callGemini(user.geminiApiKey, {
@@ -4504,6 +4516,9 @@ app.post('/ai/lectures/:lectureId/cards', async (req, res) => {
           cards = aiCards.map(c => ({
             term: c.term || c.question || '',
             definition: c.definition || c.answer || '',
+            distractors: c.distractors && Array.isArray(c.distractors) 
+              ? c.distractors.slice(0, 3) // Максимум 3 дистрактора
+              : [],
           }));
         }
       } catch (aiError) {
@@ -4582,12 +4597,24 @@ app.post('/ai/scans/:scanId/cards', async (req, res) => {
       }
 
       const content = scan.extractedText || scan.summary;
-      const prompt = `На основе этого конспекта создай 5-7 учебных карточек (flashcards).
+      const difficulty = req.body.difficulty || 'medium'; // easy, medium, hard
+      const difficultyText = difficulty === 'easy' ? 'легкие' : difficulty === 'hard' ? 'сложные' : 'средние';
+      
+      const prompt = `На основе этого конспекта создай 5-7 учебных карточек (flashcards) ${difficultyText} уровня сложности.
       
 Текст: ${content.substring(0, 3000)}
 
 Верни ТОЛЬКО JSON массив в формате:
-[{"term": "Вопрос или термин", "definition": "Ответ или определение"}, ...]`;
+[{
+  "term": "Вопрос или термин",
+  "definition": "Правильный ответ или определение",
+  "distractors": ["Неправильный вариант 1", "Неправильный вариант 2", "Неправильный вариант 3"]
+}, ...]
+
+ВАЖНО: 
+- Для каждой карточки создай ровно 3 неправильных, но схожих варианта ответов (дистракторы)
+- Дистракторы должны быть правдоподобными и логически связанными с темой
+- Они должны быть на том же уровне сложности, что указан выше`;
 
       try {
         const aiResponse = await callGemini(user.geminiApiKey, {
@@ -4602,6 +4629,9 @@ app.post('/ai/scans/:scanId/cards', async (req, res) => {
           cards = aiCards.map(c => ({
             term: c.term || c.question || '',
             definition: c.definition || c.answer || '',
+            distractors: c.distractors && Array.isArray(c.distractors) 
+              ? c.distractors.slice(0, 3) // Максимум 3 дистрактора
+              : [],
           }));
         }
       } catch (aiError) {
@@ -4611,6 +4641,7 @@ app.post('/ai/scans/:scanId/cards', async (req, res) => {
           cards = [{
             term: scan.title || 'Конспект',
             definition: scan.summary,
+            distractors: [],
           }];
         }
       }
