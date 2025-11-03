@@ -749,6 +749,22 @@ const quizResultSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now },
 }, { versionKey: false });
 
+// Schema for quiz progress (tracking user progress by topic and level)
+const quizProgressSchema = new mongoose.Schema({
+  userId: { type: Number, required: true, index: true },
+  topic: { type: String, required: true, index: true },
+  currentLevel: { type: Number, default: 1, min: 1, max: 5 },
+  masteryScore: { type: Number, default: 0.0, min: 0, max: 1.0 },
+  totalQuestions: { type: Number, default: 0 },
+  correctAnswers: { type: Number, default: 0 },
+  errorCounts: { type: Map, of: Number, default: {} },
+  lastUpdated: { type: Date, default: Date.now, index: true },
+  createdAt: { type: Date, default: Date.now },
+}, { versionKey: false });
+
+// Compound index for userId + topic
+quizProgressSchema.index({ userId: 1, topic: 1 }, { unique: true });
+
 // Schema for daily study statistics
 const studyStatsDailySchema = new mongoose.Schema({
   userId: { type: Number, required: true, index: true },
@@ -903,6 +919,7 @@ const VoiceRecording = mongoose.model('VoiceRecording', voiceRecordingSchema);
 const Achievement = mongoose.model('Achievement', achievementSchema);
 const CalendarEvent = mongoose.model('CalendarEvent', calendarEventSchema);
 const QuizResult = mongoose.model('QuizResult', quizResultSchema);
+const QuizProgress = mongoose.model('QuizProgress', quizProgressSchema);
 const StudyStatsDaily = mongoose.model('StudyStatsDaily', studyStatsDailySchema);
 const NotebookEntry = mongoose.model('NotebookEntry', notebookEntrySchema);
 const AiLecture = mongoose.model('AiLecture', aiLectureSchema);
@@ -3325,6 +3342,125 @@ app.get('/quiz-results/history/:userId', async (req, res) => {
   } catch (error) {
     console.error('[QUIZ][ERROR]', error);
     res.status(500).json({ message: 'Не удалось получить историю квизов' });
+  }
+});
+
+// ========== QUIZ PROGRESS API ==========
+
+// Save or update quiz progress
+app.post('/quiz-progress', async (req, res) => {
+  try {
+    const { userId, topic, currentLevel, masteryScore, totalQuestions, correctAnswers, errorCounts } = req.body;
+    
+    if (!userId || !topic) {
+      return res.status(400).json({ message: 'Отсутствуют обязательные поля userId и topic' });
+    }
+
+    const user = await findUserById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'Пользователь не найден' });
+    }
+
+    const progressData = {
+      userId,
+      topic,
+      currentLevel: currentLevel || 1,
+      masteryScore: masteryScore || 0.0,
+      totalQuestions: totalQuestions || 0,
+      correctAnswers: correctAnswers || 0,
+      errorCounts: errorCounts || {},
+      lastUpdated: new Date(),
+    };
+
+    const progress = await QuizProgress.findOneAndUpdate(
+      { userId, topic },
+      progressData,
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    console.log(`[QUIZ PROGRESS] Saved progress for user ${userId}, topic: ${topic}, level: ${currentLevel}`);
+    res.status(200).json({ success: true, data: progress });
+  } catch (error) {
+    console.error('[QUIZ PROGRESS][ERROR]', error);
+    res.status(500).json({ message: 'Не удалось сохранить прогресс квиза' });
+  }
+});
+
+// Get quiz progress for user and topic
+app.get('/quiz-progress/:userId/:topic', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId, 10);
+    const topic = decodeURIComponent(req.params.topic);
+
+    if (!Number.isFinite(userId)) {
+      return res.status(400).json({ message: 'Некорректный ID пользователя' });
+    }
+
+    const progress = await QuizProgress.findOne({ userId, topic }).lean();
+    
+    if (!progress) {
+      return res.status(404).json({ message: 'Прогресс не найден' });
+    }
+
+    res.status(200).json({ success: true, data: progress });
+  } catch (error) {
+    console.error('[QUIZ PROGRESS][ERROR]', error);
+    res.status(500).json({ message: 'Не удалось получить прогресс' });
+  }
+});
+
+// Get adaptive quiz questions
+app.post('/quiz-adaptive', async (req, res) => {
+  try {
+    const { userId, topic, level, availableCards, errorCounts, count } = req.body;
+    
+    if (!userId || !topic || !availableCards || !Array.isArray(availableCards)) {
+      return res.status(400).json({ message: 'Отсутствуют обязательные поля' });
+    }
+
+    // Отсортировать карточки по частоте ошибок
+    const sortedCards = [...availableCards].sort((a, b) => {
+      const aErrors = (errorCounts && errorCounts[a.term]) ? errorCounts[a.term] : 0;
+      const bErrors = (errorCounts && errorCounts[b.term]) ? errorCounts[b.term] : 0;
+      return bErrors - aErrors;
+    });
+
+    let selectedCards = [];
+
+    if (level <= 2) {
+      // Низкий уровень - больше простых карточек
+      const easyCards = sortedCards.filter(c => (errorCounts && errorCounts[c.term] ? errorCounts[c.term] : 0) <= 1);
+      selectedCards = easyCards.length >= count 
+        ? easyCards.slice(0, count)
+        : [...easyCards, ...sortedCards.filter(c => !easyCards.includes(c)).slice(0, count - easyCards.length)];
+    } else if (level >= 4) {
+      // Высокий уровень - больше сложных карточек
+      const hardCards = sortedCards.filter(c => (errorCounts && errorCounts[c.term] ? errorCounts[c.term] : 0) >= 2);
+      selectedCards = hardCards.length >= count
+        ? hardCards.slice(0, count)
+        : [...hardCards, ...sortedCards.filter(c => !hardCards.includes(c)).slice(0, count - hardCards.length)];
+    } else {
+      // Средний уровень - смешанный набор
+      selectedCards = sortedCards.slice(0, count);
+    }
+
+    // Перемешать
+    for (let i = selectedCards.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [selectedCards[i], selectedCards[j]] = [selectedCards[j], selectedCards[i]];
+    }
+
+    res.status(200).json({ 
+      success: true, 
+      data: { 
+        cards: selectedCards.slice(0, count),
+        level,
+        topic 
+      } 
+    });
+  } catch (error) {
+    console.error('[QUIZ ADAPTIVE][ERROR]', error);
+    res.status(500).json({ message: 'Не удалось получить адаптивные вопросы' });
   }
 });
 
