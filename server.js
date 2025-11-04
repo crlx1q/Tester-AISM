@@ -3687,29 +3687,56 @@ app.get('/stats/week/:userId', async (req, res) => {
     const weekAgo = new Date(today);
     weekAgo.setDate(weekAgo.getDate() - 6); // Last 7 days
 
-    const stats = await StudyStatsDaily.find({
-      userId,
-      date: { $gte: weekAgo, $lte: today }
-    }).sort({ date: 1 }).lean();
+  const rawStats = await StudyStatsDaily.find({
+    userId,
+    date: { $gte: weekAgo, $lte: today }
+  }).sort({ date: 1 }).lean();
 
-    const summary = {
-      totalStudyMinutes: 0,
-      totalScans: 0,
-      totalRecordings: 0,
-      totalChatSessions: 0,
-      totalCardsCreated: 0,
-      totalQuizzes: 0,
-      dailyStats: stats,
-    };
+  // Нормализуем по датам (без дублей): YYYY-MM-DD
+  const toKey = (d) => {
+    const dt = new Date(d);
+    return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+  };
+  const byDate = new Map();
+  for (const s of rawStats) {
+    const key = toKey(s.date);
+    const prev = byDate.get(key) || { userId, date: new Date(s.date), studyMinutes: 0, scansCount: 0, recordingsCount: 0, chatSessionsCount: 0, cardsCreated: 0, quizzesTaken: 0 };
+    prev.studyMinutes += s.studyMinutes || 0;
+    prev.scansCount += s.scansCount || 0;
+    prev.recordingsCount += s.recordingsCount || 0;
+    prev.chatSessionsCount += s.chatSessionsCount || 0;
+    prev.cardsCreated += s.cardsCreated || 0;
+    prev.quizzesTaken += s.quizzesTaken || 0;
+    byDate.set(key, prev);
+  }
 
-    stats.forEach(day => {
-      summary.totalStudyMinutes += day.studyMinutes || 0;
-      summary.totalScans += day.scansCount || 0;
-      summary.totalRecordings += day.recordingsCount || 0;
-      summary.totalChatSessions += day.chatSessionsCount || 0;
-      summary.totalCardsCreated += day.cardsCreated || 0;
-      summary.totalQuizzes += day.quizzesTaken || 0;
-    });
+  // Гарантируем 7 дней подряд
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today); d.setDate(d.getDate() - i);
+    const key = toKey(d);
+    const existing = byDate.get(key);
+    days.push(existing || { userId, date: d, studyMinutes: 0, scansCount: 0, recordingsCount: 0, chatSessionsCount: 0, cardsCreated: 0, quizzesTaken: 0 });
+  }
+
+  const summary = {
+    totalStudyMinutes: 0,
+    totalScans: 0,
+    totalRecordings: 0,
+    totalChatSessions: 0,
+    totalCardsCreated: 0,
+    totalQuizzes: 0,
+    dailyStats: days,
+  };
+
+  days.forEach(day => {
+    summary.totalStudyMinutes += day.studyMinutes || 0;
+    summary.totalScans += day.scansCount || 0;
+    summary.totalRecordings += day.recordingsCount || 0;
+    summary.totalChatSessions += day.chatSessionsCount || 0;
+    summary.totalCardsCreated += day.cardsCreated || 0;
+    summary.totalQuizzes += day.quizzesTaken || 0;
+  });
 
     res.status(200).json({ success: true, data: summary });
   } catch (error) {
@@ -3718,7 +3745,7 @@ app.get('/stats/week/:userId', async (req, res) => {
   }
 });
 
-// Get month stats
+// Get month stats (last 6 calendar months aggregated)
 app.get('/stats/month/:userId', async (req, res) => {
   try {
     const userId = parseInt(req.params.userId, 10);
@@ -3727,32 +3754,50 @@ app.get('/stats/month/:userId', async (req, res) => {
     }
 
     const today = startOfDay();
-    const monthAgo = new Date(today);
-    monthAgo.setDate(monthAgo.getDate() - 29); // Last 30 days
+    const endOfThisMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    // Собираем последние 6 месяцев (включая текущий)
+    const months = [];
+    for (let i = 5; i >= 0; i--) {
+      const monthStart = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      const monthEnd = new Date(today.getFullYear(), today.getMonth() - i + 1, 0);
+      months.push({ monthStart, monthEnd });
+    }
 
-    const stats = await StudyStatsDaily.find({
-      userId,
-      date: { $gte: monthAgo, $lte: today }
-    }).sort({ date: 1 }).lean();
+    const monthlyStats = [];
+    for (const m of months) {
+      const docs = await StudyStatsDaily.find({
+        userId,
+        date: { $gte: m.monthStart, $lte: m.monthEnd }
+      }).lean();
+      const agg = {
+        date: m.monthStart,
+        studyMinutes: 0,
+        scansCount: 0,
+        recordingsCount: 0,
+        chatSessionsCount: 0,
+        cardsCreated: 0,
+        quizzesTaken: 0,
+      };
+      for (const d of docs) {
+        agg.studyMinutes += d.studyMinutes || 0;
+        agg.scansCount += d.scansCount || 0;
+        agg.recordingsCount += d.recordingsCount || 0;
+        agg.chatSessionsCount += d.chatSessionsCount || 0;
+        agg.cardsCreated += d.cardsCreated || 0;
+        agg.quizzesTaken += d.quizzesTaken || 0;
+      }
+      monthlyStats.push(agg);
+    }
 
     const summary = {
-      totalStudyMinutes: 0,
-      totalScans: 0,
-      totalRecordings: 0,
-      totalChatSessions: 0,
-      totalCardsCreated: 0,
-      totalQuizzes: 0,
-      dailyStats: stats,
+      totalStudyMinutes: monthlyStats.reduce((a,b)=>a+(b.studyMinutes||0),0),
+      totalScans: monthlyStats.reduce((a,b)=>a+(b.scansCount||0),0),
+      totalRecordings: monthlyStats.reduce((a,b)=>a+(b.recordingsCount||0),0),
+      totalChatSessions: monthlyStats.reduce((a,b)=>a+(b.chatSessionsCount||0),0),
+      totalCardsCreated: monthlyStats.reduce((a,b)=>a+(b.cardsCreated||0),0),
+      totalQuizzes: monthlyStats.reduce((a,b)=>a+(b.quizzesTaken||0),0),
+      dailyStats: monthlyStats, // используем то же поле для совместимости
     };
-
-    stats.forEach(day => {
-      summary.totalStudyMinutes += day.studyMinutes || 0;
-      summary.totalScans += day.scansCount || 0;
-      summary.totalRecordings += day.recordingsCount || 0;
-      summary.totalChatSessions += day.chatSessionsCount || 0;
-      summary.totalCardsCreated += day.cardsCreated || 0;
-      summary.totalQuizzes += day.quizzesTaken || 0;
-    });
 
     res.status(200).json({ success: true, data: summary });
   } catch (error) {
