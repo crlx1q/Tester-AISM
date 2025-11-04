@@ -1725,7 +1725,7 @@ app.post('/ai/voice', async (req, res) => {
 
 app.post('/ai/chat', async (req, res) => {
   try {
-    const { userId, message, history, attachments } = req.body || {};
+    const { userId, message, history, attachments, skipChatTracking } = req.body || {};
     if (!userId || !message || typeof message !== 'string') {
       return res.status(400).json({ message: 'userId и message обязательны' });
     }
@@ -1785,24 +1785,27 @@ app.post('/ai/chat', async (req, res) => {
       console.warn('[AI][Chat] WARNING: Empty or fallback response from Gemini');
     }
 
-    incrementUsage(user, 'chat');
-    updateUserStreak(user);
-    appendHistoryEntry(user, 'chat', {
-      id: generateEntryId(),
-      userMessage: message,
-      aiResponse: aiText,
-      attachments: Array.isArray(attachments) ? attachments.map((attachment) => ({
-        type: attachment.type || 'image',
-        mimeType: attachment.mimeType || 'image/jpeg',
-        data: attachment.data || '',
-      })) : [],
-      createdAt: new Date(),
-    });
+    // Только если это не внутренний запрос (например, генерация дистракторов для квизов)
+    if (!skipChatTracking) {
+      incrementUsage(user, 'chat');
+      updateUserStreak(user);
+      appendHistoryEntry(user, 'chat', {
+        id: generateEntryId(),
+        userMessage: message,
+        aiResponse: aiText,
+        attachments: Array.isArray(attachments) ? attachments.map((attachment) => ({
+          type: attachment.type || 'image',
+          mimeType: attachment.mimeType || 'image/jpeg',
+          data: attachment.data || '',
+        })) : [],
+        createdAt: new Date(),
+      });
 
-    await user.save();
+      await user.save();
 
-    // Update stats automatically
-    await updateStats(userId, { chatSessionsCount: 1 });
+      // Update stats automatically только для реальных чатов
+      await updateStats(userId, { chatSessionsCount: 1 });
+    }
 
     return res.json({
       success: true,
