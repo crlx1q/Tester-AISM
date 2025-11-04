@@ -3718,6 +3718,95 @@ app.get('/stats/week/:userId', async (req, res) => {
   }
 });
 
+// Get month stats
+app.get('/stats/month/:userId', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId, 10);
+    if (!Number.isFinite(userId)) {
+      return res.status(400).json({ message: 'Некорректный ID пользователя' });
+    }
+
+    const today = startOfDay();
+    const monthAgo = new Date(today);
+    monthAgo.setDate(monthAgo.getDate() - 29); // Last 30 days
+
+    const stats = await StudyStatsDaily.find({
+      userId,
+      date: { $gte: monthAgo, $lte: today }
+    }).sort({ date: 1 }).lean();
+
+    const summary = {
+      totalStudyMinutes: 0,
+      totalScans: 0,
+      totalRecordings: 0,
+      totalChatSessions: 0,
+      totalCardsCreated: 0,
+      totalQuizzes: 0,
+      dailyStats: stats,
+    };
+
+    stats.forEach(day => {
+      summary.totalStudyMinutes += day.studyMinutes || 0;
+      summary.totalScans += day.scansCount || 0;
+      summary.totalRecordings += day.recordingsCount || 0;
+      summary.totalChatSessions += day.chatSessionsCount || 0;
+      summary.totalCardsCreated += day.cardsCreated || 0;
+      summary.totalQuizzes += day.quizzesTaken || 0;
+    });
+
+    res.status(200).json({ success: true, data: summary });
+  } catch (error) {
+    console.error('[STATS][ERROR]', error);
+    res.status(500).json({ message: 'Не удалось получить месячную статистику' });
+  }
+});
+
+// Clear all stats for user
+app.delete('/stats/clear/:userId', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId, 10);
+    if (!Number.isFinite(userId)) {
+      return res.status(400).json({ message: 'Некорректный ID пользователя' });
+    }
+
+    // Delete all daily stats
+    const deletedStats = await StudyStatsDaily.deleteMany({ userId });
+    
+    // Delete all quiz results
+    const deletedQuizResults = await QuizResult.deleteMany({ userId });
+    
+    // Delete all quiz progress
+    const deletedQuizProgress = await QuizProgress.deleteMany({ userId });
+    
+    // Reset user streak
+    const user = await findUserById(userId);
+    if (user) {
+      user.streak = {
+        current: 0,
+        longest: user.streak?.longest || 0,
+        lastActiveDate: null,
+        updatedAt: new Date(),
+      };
+      await user.save();
+    }
+
+    console.log(`[STATS][CLEAR] Cleared all stats for user ${userId}: ${deletedStats.deletedCount} daily stats, ${deletedQuizResults.deletedCount} quiz results, ${deletedQuizProgress.deletedCount} quiz progress`);
+
+    res.status(200).json({ 
+      success: true, 
+      message: 'Статистика успешно очищена',
+      deleted: {
+        dailyStats: deletedStats.deletedCount,
+        quizResults: deletedQuizResults.deletedCount,
+        quizProgress: deletedQuizProgress.deletedCount,
+      }
+    });
+  } catch (error) {
+    console.error('[STATS][ERROR] clear', error);
+    res.status(500).json({ message: 'Не удалось очистить статистику' });
+  }
+});
+
 // ========== NOTEBOOK API ==========
 
 // Get notebook entries with filters
