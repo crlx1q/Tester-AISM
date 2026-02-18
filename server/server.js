@@ -26,10 +26,10 @@ const JWT_EXPIRES_IN = '8h';
 const secureCookie = ((process.env.COOKIE_SECURE || '').toLowerCase() === 'true') || process.env.NODE_ENV === 'production';
 const BCRYPT_SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS) || 10;
 
-const MONGO_USER = process.env.USERDB;
+const MONGO_USER = process.env.USERDB || 'AIStudyMate_ADM';
 const MONGO_PASS = process.env.PASSWDB;
 const MONGO_DB_NAME = process.env.MONGO_DB_NAME || 'AIStudyMate';
-const MONGO_HOST = process.env.MONGO_HOST || 'your-mongodb-host.mongodb.net';
+const MONGO_HOST = process.env.MONGO_HOST || 'aistudymate.9ye4bug.mongodb.net';
 const MONGO_APP_NAME = process.env.MONGO_APP_NAME || 'AIStudyMate';
 
 const buildMongoUri = () => {
@@ -61,9 +61,9 @@ logSecretStatus('USERDB', MONGO_USER);
 logSecretStatus('PASSWDB', MONGO_PASS ? '********' : '');
 
 const DEFAULT_ALLOWED_ORIGINS = [
-  'https://your-app-name.koyeb.app',
+  'https://aistudymate.reflexai.pro',
   'http://localhost:3000',
-  'https://your-domain.com'
+  'http://localhost:5173'
 ];
 
 const configuredOrigins = (process.env.ALLOWED_ORIGINS || '')
