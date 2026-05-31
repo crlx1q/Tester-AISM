@@ -61,6 +61,7 @@ logSecretStatus('USERDB', MONGO_USER);
 logSecretStatus('PASSWDB', MONGO_PASS ? '********' : '');
 
 const DEFAULT_ALLOWED_ORIGINS = [
+  'https://urban-shanta-chapter1-cr1-372ff024.koyeb.app',
   'https://aistudymate.reflexai.pro',
   'http://localhost:3000',
   'http://localhost:5173'
@@ -167,6 +168,35 @@ const CHAT_SYSTEM_PROMPT = `Ты — AI-репетитор StudyMate. Отвеч
 - Если нужна справка с сети, используй свежие знания и указывай, что данные могут быть неточными.
 - Поддерживай русский язык ответа.
 - Если вопрос выходит за рамки обучения, отвечай вежливо.`;
+
+const normalizeAiLanguage = (value = 'ru') => {
+  const lang = String(value || 'ru').trim().toLowerCase();
+  if (lang === 'kz') return 'kk';
+  if (lang === 'kk' || lang === 'en' || lang === 'ru') return lang;
+  return 'ru';
+};
+
+const buildResponseLanguageInstruction = (language) => {
+  const lang = normalizeAiLanguage(language);
+  if (lang === 'en') {
+    return 'IMPORTANT: Return all textual fields in English.';
+  }
+  if (lang === 'kk') {
+    return 'ВАЖНО: Все текстовые поля верни на казахском языке.';
+  }
+  return 'ВАЖНО: Возвращай все текстовые поля на русском языке.';
+};
+
+const buildChatLanguageInstruction = (language) => {
+  const lang = normalizeAiLanguage(language);
+  if (lang === 'en') {
+    return 'IMPORTANT: Answer in English.';
+  }
+  if (lang === 'kk') {
+    return 'ВАЖНО: Отвечай на казахском языке.';
+  }
+  return 'ВАЖНО: Отвечай на русском языке.';
+};
 
 const startOfDay = (value = new Date()) => {
   const date = new Date(value);
@@ -1523,7 +1553,7 @@ app.get('/ai/history/:userId', async (req, res) => {
 
 app.post('/ai/scan', async (req, res) => {
   try {
-    const { userId, mimeType, base64Image, prompt } = req.body || {};
+    const { userId, mimeType, base64Image, prompt, language } = req.body || {};
     if (!userId || !base64Image) {
       return res.status(400).json({ message: 'userId и base64Image обязательны' });
     }
@@ -1543,6 +1573,8 @@ app.post('/ai/scan', async (req, res) => {
     if (prompt && String(prompt).trim().length > 0) {
       instructionParts.push(`Дополнительные указания пользователя: ${String(prompt).trim()}`);
     }
+
+    instructionParts.push(buildResponseLanguageInstruction(language));
 
     const payload = {
       systemInstruction: { parts: [{ text: instructionParts.join('\n\n') }] },
@@ -1600,6 +1632,7 @@ app.post('/ai/scan', async (req, res) => {
       keyPoints: analysis.keyPoints,
       questions: analysis.questions,
       prompt: prompt ? String(prompt) : '',
+      language: normalizeAiLanguage(language),
       mimeType: mimeType || 'image/jpeg',
       raw: analysis.raw,
       createdAt: new Date(),
@@ -1630,7 +1663,7 @@ app.post('/ai/scan', async (req, res) => {
 
 app.post('/ai/voice', async (req, res) => {
   try {
-    const { userId, mimeType, base64Audio, prompt } = req.body || {};
+    const { userId, mimeType, base64Audio, prompt, language } = req.body || {};
     if (!userId || !base64Audio) {
       return res.status(400).json({ message: 'userId и base64Audio обязательны' });
     }
@@ -1650,6 +1683,8 @@ app.post('/ai/voice', async (req, res) => {
     if (prompt && String(prompt).trim().length > 0) {
       instructionParts.push(`Дополнительные указания пользователя: ${String(prompt).trim()}`);
     }
+
+    instructionParts.push(buildResponseLanguageInstruction(language));
 
     const payload = {
       systemInstruction: { parts: [{ text: instructionParts.join('\n\n') }] },
@@ -1695,6 +1730,7 @@ app.post('/ai/voice', async (req, res) => {
       summary: voiceData.summary,
       keyPoints: voiceData.keyPoints,
       questions: voiceData.questions,
+      language: normalizeAiLanguage(language),
       mimeType: mimeType || 'audio/mp3',
       raw: voiceData.raw,
       createdAt: new Date(),
@@ -1725,7 +1761,7 @@ app.post('/ai/voice', async (req, res) => {
 
 app.post('/ai/chat', async (req, res) => {
   try {
-    const { userId, message, history, attachments, skipChatTracking } = req.body || {};
+    const { userId, message, history, attachments, skipChatTracking, language } = req.body || {};
     if (!userId || !message || typeof message !== 'string') {
       return res.status(400).json({ message: 'userId и message обязательны' });
     }
@@ -1770,7 +1806,9 @@ app.post('/ai/chat', async (req, res) => {
     contents.push({ role: 'user', parts: currentMessageParts });
 
     const payload = {
-      systemInstruction: { parts: [{ text: CHAT_SYSTEM_PROMPT }] },
+      systemInstruction: {
+        parts: [{ text: `${CHAT_SYSTEM_PROMPT}\n${buildChatLanguageInstruction(language)}` }],
+      },
       contents,
       generationConfig: { temperature: 0.85, topK: 40, topP: 0.95, maxOutputTokens: 1024 },
     };
@@ -1798,6 +1836,7 @@ app.post('/ai/chat', async (req, res) => {
           mimeType: attachment.mimeType || 'image/jpeg',
           data: attachment.data || '',
         })) : [],
+        language: normalizeAiLanguage(language),
         createdAt: new Date(),
       });
 

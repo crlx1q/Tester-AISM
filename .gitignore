@@ -1,0 +1,10 @@
+# Ignore everything
+*
+
+# Except what's tracked in the GitHub repo (crlx1q/Tester-AISM)
+!.gitignore
+!server.js
+!package.json
+!package-lock.json
+!public/
+!public/**
