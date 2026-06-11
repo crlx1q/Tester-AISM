@@ -61,10 +61,7 @@ logSecretStatus('USERDB', MONGO_USER);
 logSecretStatus('PASSWDB', MONGO_PASS ? '********' : '');
 
 const DEFAULT_ALLOWED_ORIGINS = [
-  'https://urban-shanta-chapter1-cr1-372ff024.koyeb.app',
-  'https://aistudymate.reflexai.pro',
-  'http://localhost:3000',
-  'http://localhost:5173'
+  'https://aistudymate.crlx1q.com'
 ];
 
 const configuredOrigins = (process.env.ALLOWED_ORIGINS || '')
