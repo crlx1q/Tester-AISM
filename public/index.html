@@ -441,11 +441,11 @@
 <body>
     <header class="header">
         <div class="container">
-            <a href="#" class="logo-text">AI-StudyMate</a>
-            <div class="lang-switcher" id="lang-switcher" aria-label="Language switcher">
-                <button type="button" class="lang-btn is-active" data-lang="ru">Ru</button>
-                <button type="button" class="lang-btn" data-lang="kz">Kz</button>
-                <button type="button" class="lang-btn" data-lang="en">En</button>
+            <a href="#home" class="logo-text">AI-StudyMate</a>
+            <div class="lang-switcher" id="lang-switcher" role="group" aria-label="Language">
+                <button type="button" class="lang-btn is-active" data-lang="ru" aria-pressed="true">Ru</button>
+                <button type="button" class="lang-btn" data-lang="kz" aria-pressed="false">Kz</button>
+                <button type="button" class="lang-btn" data-lang="en" aria-pressed="false">En</button>
             </div>
         </div>
     </header>
@@ -456,9 +456,9 @@
                 <div class="logo-circle"><img src="/logo.png" alt="Logo" style="width:120px;height:120px;border-radius:24px"></div>
                 
                 <h1>AI-StudyMate</h1>
-                <p class="tagline">Ваш личный умный помощник в учёбе</p>
+                <p class="tagline" data-i18n="site_tagline">Ваш личный умный помощник в учёбе</p>
                 
-                <p class="description">
+                <p class="description" data-i18n="site_hero_description">
                     AI‑StudyMate превращает разрозненные конспекты, голосовые записи и планы занятий в ясную, 
                     структурированную и мотивирующую систему обучения.
                 </p>
@@ -467,7 +467,7 @@
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                         <path d="M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z"/>
                     </svg>
-                    Скачать
+                    <span data-i18n="site_download">Скачать</span>
                 </a>
             </div>
         </div>
@@ -475,8 +475,8 @@
 
     <section class="features" id="features">
         <div class="container">
-            <h2 class="section-title">Как это работает?</h2>
-            <p class="section-subtitle">
+            <h2 class="section-title" data-i18n="site_features_title">Как это работает?</h2>
+            <p class="section-subtitle" data-i18n="site_features_intro">
                 В центре AI‑StudyMate — ключевые сценарии, из которых складывается современная учёба. 
                 Приложение бережно «раскидывает» всё по местам и помогает разобраться в сложных темах.
             </p>
@@ -488,8 +488,8 @@
                            <path d="M3 15v-2h2v2H3zm0-4v-2h2v2H3zm0-4V5h2v2H3zm4 8v-2h2v2H7zm0-4v-2h2v2H7zm0-4V5h2v2H7zm4 8v-2h2v2h-2zm0-4v-2h2v2h-2zm0-4V5h2v2h-2zm4 12v-2h2v2h-2zm-4 0v-2h2v2h-2zm8 0v-2h2v2h-2zm0-4v-2h2v2h-2zm0-4v-2h2v2h-2zm0-4V5h2v2h-2zm-4 8v-2h2v2h-2zm0-4v-2h2v2h-2z"/>
                         </svg>
                     </div>
-                    <h3 class="feature-title">Скан-конспекты</h3>
-                    <p class="feature-description">
+                    <h3 class="feature-title" data-i18n="site_scan_title">Скан-конспекты</h3>
+                    <p class="feature-description" data-i18n="site_scan_description">
                         Сделайте снимок — и через минуту у вас структурированный материал: краткое резюме темы, 
                         перечень основных смыслов и вопросы для тренировки памяти.
                     </p>
@@ -502,8 +502,8 @@
                             <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
                         </svg>
                     </div>
-                    <h3 class="feature-title">Умный диктофон</h3>
-                    <p class="feature-description">
+                    <h3 class="feature-title" data-i18n="site_recorder_title">Умный диктофон</h3>
+                    <p class="feature-description" data-i18n="site_recorder_description">
                         Он сохраняет лекции в фоне, а затем помогает «вытащить» из них самое главное: 
                         транскрипт, тезисы, краткий конспект и идеи для вопросов.
                     </p>
@@ -515,8 +515,8 @@
                             <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
                         </svg>
                     </div>
-                    <h3 class="feature-title">AI-Тьютор</h3>
-                    <p class="feature-description">
+                    <h3 class="feature-title" data-i18n="site_tutor_title">AI-Тьютор</h3>
+                    <p class="feature-description" data-i18n="site_tutor_description">
                         Дружелюбный собеседник, который объясняет сложные вещи простым языком, 
                         подстраивается под ваш уровень и ведёт диалог на русском.
                     </p>
@@ -528,8 +528,8 @@
                             <path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/>
                         </svg>
                     </div>
-                    <h3 class="feature-title">Планировщик</h3>
-                    <p class="feature-description">
+                    <h3 class="feature-title" data-i18n="site_planner_title">Планировщик</h3>
+                    <p class="feature-description" data-i18n="site_planner_description">
                         Превращает намерения в привычку. За пару нажатий у вас появляется недельный план 
                         с реалистичными задачами и чётким фокусом на сегодня.
                     </p>
@@ -541,8 +541,8 @@
                             <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-2h2v2zm0-4H7v-2h2v2zm0-4H7V7h2v2zm4 8h-2v-2h2v2zm0-4h-2v-2h2v2zm0-4h-2V7h2v2zm4 8h-2v-2h2v2zm0-4h-2v-2h2v2zm0-4h-2V7h2v2z"/>
                         </svg>
                     </div>
-                    <h3 class="feature-title">Тесты и карточки</h3>
-                    <p class="feature-description">
+                    <h3 class="feature-title" data-i18n="site_quiz_title">Тесты и карточки</h3>
+                    <p class="feature-description" data-i18n="site_quiz_description">
                         По вашим конспектам и лекциям AI‑StudyMate создаёт вопросы, помогает быстро 
                         проверить знание терминов и понятий, и фиксирует результаты.
                     </p>
@@ -554,8 +554,8 @@
                            <path d="M4 10h6v-6H4v6zm0 10h6v-6H4v6zm8 0h6v-6h-6v6zm0-10h6v-6h-6v6z"/>
                         </svg>
                     </div>
-                    <h3 class="feature-title">Главный экран</h3>
-                    <p class="feature-description">
+                    <h3 class="feature-title" data-i18n="site_home_title">Главный экран</h3>
+                    <p class="feature-description" data-i18n="site_home_description">
                         На главном экране — всё важное: свежие инсайты недели, прогресс, ближайшие 
                         задачи и быстрые действия. Без суеты и лишних экранов.
                     </p>
@@ -566,8 +566,8 @@
 
     <section class="who-is-it-for">
         <div class="container">
-            <h2 class="section-title">Для кого это приложение?</h2>
-            <p class="section-subtitle">
+            <h2 class="section-title" data-i18n="site_audience_title">Для кого это приложение?</h2>
+            <p class="section-subtitle" data-i18n="site_audience_description">
                 AI‑StudyMate особенно полезен школьникам и студентам, которые хотят учиться проще и умнее; 
                 тем, кто готовится к экзаменам и контрольным; всем, кто ценит время и хочет, 
                 чтобы технологии по‑настоящему помогали в освоении материала.
@@ -579,20 +579,20 @@
         <div class="container">
             <div class="stats-grid">
                 <div class="stat-item">
-                    <h3>AI-Тьютор</h3>
-                    <p>Объясняет 24/7</p>
+                    <h3 data-i18n="site_stat_tutor">AI-Тьютор</h3>
+                    <p data-i18n="site_stat_tutor_description">Объясняет 24/7</p>
                 </div>
                 <div class="stat-item">
                     <h3>100%</h3>
-                    <p>Структурированный материал</p>
+                    <p data-i18n="site_stat_material">Структурированный материал</p>
                 </div>
                 <div class="stat-item">
-                    <h3>План</h3>
-                    <p>Ваш недельный прогресс</p>
+                    <h3 data-i18n="site_stat_plan">План</h3>
+                    <p data-i18n="site_stat_plan_description">Ваш недельный прогресс</p>
                 </div>
                 <div class="stat-item">
-                    <h3>Фокус</h3>
-                    <p>Обучение без стресса</p>
+                    <h3 data-i18n="site_stat_focus">Фокус</h3>
+                    <p data-i18n="site_stat_focus_description">Обучение без стресса</p>
                 </div>
             </div>
         </div>
@@ -600,7 +600,7 @@
 
     <footer>
         <div class="container">
-            <p>© 2026 AI-StudyMate. Умный помощник в учёбе.</p>
+            <p data-i18n="site_footer">© 2026 AI-StudyMate. Умный помощник в учёбе.</p>
         </div>
     </footer>
 
@@ -608,109 +608,40 @@
         const SUPPORTED_LANGS = ['ru', 'kz', 'en'];
         const DEFAULT_LANG = 'ru';
         const STORAGE_KEY = 'site_lang';
-        const localeCache = new Map();
-
-        const I18N_KEYS = {
-            title: 'site_ai_studymate_vash_umnyy_pomoschnik_v_uchyobe',
-            description: 'site_ai_studymate_prevraschaet_konspekty_golosovye_zapisi_i_plany_zanyatiy_v',
-        };
-
-        const I18N_BINDINGS = {
-            site_vash_lichnyy_umnyy_pomoschnik_v_uchyobe: ['.tagline'],
-            site_ai_studymate_prevraschaet_razroznennye_konspekty_golosovye_zapisi_i_plan: ['.description'],
-            site_skachat: ['.cta-btn'],
-            site_kak_eto_rabotaet: ['#features .section-title'],
-            site_v_tsentre_ai_studymate_klyuchevye_stsenarii_iz_kotoryh_skladyvaetsya_sov: ['#features .section-subtitle'],
-            site_skan_konspekty: ['.features-grid .feature-card:nth-child(1) .feature-title'],
-            site_sdelayte_snimok_i_cherez_minutu_u_vas_strukturirovannyy_material_kratkoe: ['.features-grid .feature-card:nth-child(1) .feature-description'],
-            site_umnyy_diktofon: ['.features-grid .feature-card:nth-child(2) .feature-title'],
-            site_on_sohranyaet_lektsii_v_fone_a_zatem_pomogaet_vytaschit_iz_nih_samoe_gla: ['.features-grid .feature-card:nth-child(2) .feature-description'],
-            site_ai_tyutor: ['.features-grid .feature-card:nth-child(3) .feature-title', '.stats-grid .stat-item:nth-child(1) h3'],
-            site_druzhelyubnyy_sobesednik_kotoryy_obyasnyaet_slozhnye_veschi_prostym_yazy: ['.features-grid .feature-card:nth-child(3) .feature-description'],
-            site_planirovschik: ['.features-grid .feature-card:nth-child(4) .feature-title'],
-            site_prevraschaet_namereniya_v_privychku_za_paru_nazhatiy_u_vas_poyavlyaetsya: ['.features-grid .feature-card:nth-child(4) .feature-description'],
-            site_testy_i_kartochki: ['.features-grid .feature-card:nth-child(5) .feature-title'],
-            site_po_vashim_konspektam_i_lektsiyam_ai_studymate_sozdayot_voprosy_pomogaet: ['.features-grid .feature-card:nth-child(5) .feature-description'],
-            site_glavnyy_ekran: ['.features-grid .feature-card:nth-child(6) .feature-title'],
-            site_na_glavnom_ekrane_vsyo_vazhnoe_svezhie_insayty_nedeli_progress_blizhaysh: ['.features-grid .feature-card:nth-child(6) .feature-description'],
-            site_dlya_kogo_eto_prilozhenie: ['.who-is-it-for .section-title'],
-            site_ai_studymate_osobenno_polezen_shkolnikam_i_studentam_kotorye_hotyat_uchi: ['.who-is-it-for .section-subtitle'],
-            site_obyasnyaet_24_7: ['.stats-grid .stat-item:nth-child(1) p'],
-            site_strukturirovannyy_material: ['.stats-grid .stat-item:nth-child(2) p'],
-            site_plan: ['.stats-grid .stat-item:nth-child(3) h3'],
-            site_vash_nedelnyy_progress: ['.stats-grid .stat-item:nth-child(3) p'],
-            site_fokus: ['.stats-grid .stat-item:nth-child(4) h3'],
-            site_obuchenie_bez_stressa: ['.stats-grid .stat-item:nth-child(4) p'],
-            site_k_2026_ai_studymate_umnyy_pomoschnik_v_uchyobe: ['footer p'],
-        };
-
         const normalizeLang = (lang) => SUPPORTED_LANGS.includes(lang) ? lang : DEFAULT_LANG;
 
-        const setActiveLangButton = (lang) => {
-            document.querySelectorAll('.lang-btn').forEach((btn) => {
-                btn.classList.toggle('is-active', btn.dataset.lang === lang);
-            });
-        };
-
-        const fetchLocale = async (lang) => {
+        const setLanguage = (lang) => {
             const safeLang = normalizeLang(lang);
-
-            if (localeCache.has(safeLang)) {
-                return localeCache.get(safeLang);
-            }
-
-            const response = await fetch(`/locales/${safeLang}.json`);
-            if (!response.ok) {
-                throw new Error(`Locale loading failed: ${safeLang}`);
-            }
-
-            const locale = await response.json();
-            localeCache.set(safeLang, locale);
-            return locale;
-        };
-
-        const applyLocale = (locale, lang) => {
-            const titleText = locale[I18N_KEYS.title];
-            if (titleText) {
-                document.title = titleText;
-            }
-
-            const descriptionText = locale[I18N_KEYS.description];
-            const metaDescription = document.querySelector('meta[name="description"]');
-            if (metaDescription && descriptionText) {
-                metaDescription.setAttribute('content', descriptionText);
-            }
-
-            Object.entries(I18N_BINDINGS).forEach(([key, selectors]) => {
-                const value = locale[key];
-                if (!value) return;
-
-                selectors.forEach((selector) => {
-                    document.querySelectorAll(selector).forEach((node) => {
-                        node.textContent = value;
+            fetch(`/locales/${safeLang}.json`)
+                .then((response) => {
+                    if (!response.ok) throw new Error(`Locale loading failed: ${safeLang}`);
+                    return response.json();
+                })
+                .then((locale) => {
+                    document.title = locale.site_title || document.title;
+                    const description = document.querySelector('meta[name="description"]');
+                    if (description && locale.site_description) {
+                        description.content = locale.site_description;
+                    }
+                    document.querySelectorAll('[data-i18n]').forEach((node) => {
+                        const value = locale[node.dataset.i18n];
+                        if (value) node.textContent = value;
                     });
-                });
-            });
 
-            document.documentElement.lang = lang === 'kz' ? 'kk' : lang;
-            setActiveLangButton(lang);
-        };
-
-        const setLanguage = async (lang) => {
-            const safeLang = normalizeLang(lang);
-            try {
-                const locale = await fetchLocale(safeLang);
-                applyLocale(locale, safeLang);
-                localStorage.setItem(STORAGE_KEY, safeLang);
-            } catch (error) {
-                if (safeLang !== DEFAULT_LANG) {
-                    const fallbackLocale = await fetchLocale(DEFAULT_LANG);
-                    applyLocale(fallbackLocale, DEFAULT_LANG);
-                    localStorage.setItem(STORAGE_KEY, DEFAULT_LANG);
-                    return;
-                }
-                console.error('Failed to apply locale:', error);
-            }
+                    const documentLang = safeLang === 'kz' ? 'kk' : safeLang;
+                    document.documentElement.lang = documentLang;
+                    document.querySelectorAll('.lang-btn').forEach((button) => {
+                        const isActive = button.dataset.lang === safeLang;
+                        button.classList.toggle('is-active', isActive);
+                        button.setAttribute('aria-pressed', String(isActive));
+                    });
+                    try {
+                        localStorage.setItem(STORAGE_KEY, safeLang);
+                    } catch (error) {
+                        // Keep the selected language for this page even when storage is unavailable.
+                    }
+                })
+                .catch((error) => console.error('Failed to apply locale:', error));
         };
 
         const languageSwitcher = document.getElementById('lang-switcher');
@@ -722,7 +653,12 @@
             });
         }
 
-        const initialLang = normalizeLang(localStorage.getItem(STORAGE_KEY) || DEFAULT_LANG);
+        let initialLang = DEFAULT_LANG;
+        try {
+            initialLang = normalizeLang(localStorage.getItem(STORAGE_KEY) || DEFAULT_LANG);
+        } catch (error) {
+            // The default language remains usable when storage is unavailable.
+        }
         setLanguage(initialLang);
     </script>
 
